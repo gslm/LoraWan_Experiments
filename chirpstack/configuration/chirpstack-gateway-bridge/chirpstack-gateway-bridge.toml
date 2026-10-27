@@ -1,0 +1,36 @@
+# See https://www.chirpstack.io/gateway-bridge/install/config/ for a full
+# configuration example and documentation.
+#
+# SENSE ADR lab: Semtech UDP packet-forwarder backend for AU915 sub-band 2.
+# Point the gateway's packet forwarder at <workstation IP>:1700 (up and down).
+# The MQTT topic prefix ("au915_1") MUST match regions.gateway.backend.mqtt
+# .topic_prefix in ../chirpstack/region_au915_1.toml, otherwise ChirpStack
+# never sees the uplinks of this gateway.
+
+[backend]
+type="semtech_udp"
+
+  [backend.semtech_udp]
+  # ip:port to bind the UDP listener to (inside the container; published
+  # on the host as 1700/udp by docker-compose.yml).
+  udp_bind="0.0.0.0:1700"
+
+  # Upstream defaults.
+  skip_crc_check=false
+  fake_rx_time=false
+
+
+[integration]
+# JSON instead of upstream protobuf so gateway topics are human-readable with
+# mosquitto_sub (ChirpStack v4 auto-detects JSON vs protobuf per gateway).
+marshaler="json"
+
+  [integration.mqtt]
+  event_topic_template="au915_1/gateway/{{ .GatewayID }}/event/{{ .EventType }}"
+  state_topic_template="au915_1/gateway/{{ .GatewayID }}/state/{{ .StateType }}"
+  command_topic_template="au915_1/gateway/{{ .GatewayID }}/command/#"
+
+  [integration.mqtt.auth.generic]
+  servers=["tcp://mosquitto:1883"]
+  username=""
+  password=""
