@@ -1,0 +1,6 @@
+{
+  "board": "NUCLEO-WL55JC1",
+  "device": "STM32WL55JCIx",
+  "toolchain": "GCC",
+  "core": "Cortex-M4"
+}
