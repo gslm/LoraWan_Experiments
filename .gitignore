@@ -1,0 +1,24 @@
+# Stakeholder material and AI working files (DIRECTIVES.md rule 13)
+ai-content/
+
+# STM32CubeWL clones, re-fetched by firmware/tools/assemble_from_cube.sh
+third_party/
+
+# Build output
+build/
+
+# Teammate's original firmware image (kept locally, not versioned)
+firmware/backup/
+
+# ChirpStack: API token and runtime data
+chirpstack/.api_token
+chirpstack/.env
+chirpstack/data/
+chirpstack/lorawan-devices/
+
+# Workspace-local editor settings (absolute paths, colours)
+/.vscode/
+
+# Python
+__pycache__/
+*.pyc
