@@ -1,0 +1,134 @@
+# NUCLEO-WL55JC /dev/ttyACM2 @115200, LoRaWAN_End_Node_ADR Debug build, captured 2026-10-27 after flash+reset.
+# Lines before host +1.3 s (stale bytes from the previous Zephyr demo buffered in the VCP) removed.
+# Device t= values are RTC-based and continue across the software reset (first boot after flashing = t<17 s).
+[host +  1.403] 16s336:RX_1 on freq 925700000 Hz at DR 10
+[host +  1.603] 16s452:MAC rxDone
+[host +  1.603] [DL] t=16.454 RX1 DR10(SF10/500) rssi=-51 snr=8 CONF FCntDown=1 DevAddr=0146BD4D FPort=0 FRMPayload=10B FOptsLen=0 ACK=0 ADR=0 FPending=0 ADR_ACK_CNT=0->0
+[host +  1.603] [MAC] t=16.455 RX 10 byte(s) of MAC commands in RX1 (snr=8), 2 parsable cmd(s): 0320020071032000FF01
+[host +  1.603] [MAC] t=16.455   LinkADRReq [block 1, cmd 1/2] raw=0320020071 DataRate=DR2(SF10/125) TXPower=0(EIRP 30.0dBm) ChMask=0x0002 ChMaskCntl=7 NbTrans=1
+[host +  1.603] [MAC] t=16.455   LinkADRReq [block 1, cmd 2/2] raw=032000FF01 DataRate=DR2(SF10/125) TXPower=0(EIRP 30.0dBm) ChMask=0xFF00 ChMaskCntl=0 NbTrans=1
+[host +  1.603] [ADR] t=16.456 LinkADRReq block of 2 cmd(s) -> LinkADRAns status=0x07 (PowerACK=1 DataRateACK=1 ChMaskACK=1) x2 => APPLIED: DR2(SF10/125)->DR2(SF10/125) TXPower 0->0 NbTrans 1->1 ChMask(now)=FF00.0000.0000.0000.0002 ch=8-15,65
+[host +  1.603] [MAC] t=16.456 queue LinkADRAns (CID 0x03) payload=07 [PowerACK=1 DataRateACK=1 ChMaskACK=1]
+[host +  1.603] [MAC] t=16.456 queue LinkADRAns (CID 0x03) payload=07 [PowerACK=1 DataRateACK=1 ChMaskACK=1]
+[host +  1.603] [UL] t=16.456 done FCnt=1 status=OK DR2(SF10/125) pwrIdx=0 ch=12 | MIB now: ADR=1 DR2(SF10/125) TXPower=0 NbTrans=1 ChMask=FF00.0000.0000.0000.0002
+[host +  1.603] 
+[host +  1.603] ###### ========== MCPS-Confirm =============
+[host +  1.603] ###### U/L FRAME:0001 | PORT:2 | DR:2 | PWR:0 | MSG TYPE:UNCONFIRMED
+[host +  1.603] ###### D/L FRAME:0001 | PORT:0 | DR:10 | SLOT:1 | RSSI:-51 | SNR:8
+[host +  1.603] 16s460:TX on freq 917400000 Hz at DR 2
+[host +  1.804] [UL] t=16.462 FCnt=2 UNCONF port=0 len=4 tx=1/1 ch=11 f=917.400MHz DR2(SF10/125) pwr=idx0 EIRP=30.0dBm cond=27dBm rf=22dBm(HP,CLAMPED) ToA=330ms ADR=1 ADRACKReq=0 ACK=1 ADR_ACK_CNT=0/64+32 ULdwell=1 (FPort 0 = MAC cmds only, see [MAC] queue lines)
+[host +  2.004] 16s792:MAC txDone
+[host +  2.204] APPLICATION_VERSION: V1.4.0
+[host +  2.204] MW_LORAWAN_VERSION:  V2.6.2
+[host +  2.204] MW_RADIO_VERSION:    V1.3.1
+[host +  2.204] L2_SPEC_VERSION:     V1.0.4
+[host +  2.204] RP_SPEC_VERSION:     V2-1.0.3
+[host +  2.204] ###### AppKey:      2B:7E:15:16:28:AE:D2:A6:AB:F7:15:88:09:CF:4F:3C
+[host +  2.204] ###### NwkKey:      2B:7E:15:16:28:AE:D2:A6:AB:F7:15:88:09:CF:4F:3C
+[host +  2.204] ###### AppSKey:     2B:7E:15:16:28:AE:D2:A6:AB:F7:15:88:09:CF:4F:3C
+[host +  2.204] ###### NwkSKey:     2B:7E:15:16:28:AE:D2:A6:AB:F7:15:88:09:CF:4F:3C
+[host +  2.204] ###### DevEUI:      00:80:E1:15:05:30:F7:17
+[host +  2.204] ###### AppEUI:      01:01:01:01:01:01:01:01
+[host +  2.204] ###### DevAddr:     05:30:F7:17
+[host +  2.204] [JOIN] t=17.000 cfg region=AU915 subband=2 HYBRID=1 class=A ADR=ON port=2 period=15000ms uplinks=UNCONFIRMED
+[host +  2.204] [JOIN] t=17.000 cfg DevEUI=0080E1150530F717 JoinEUI=0101010101010101 (MSB first, as entered in the network server)
+[host +  2.204] [JOIN] t=17.000 cfg ChMask=FF00.0000.0000.0000.0002 ch=8-15,65 defaultDR=DR2 minUL=DR2 (with UplinkDwellTime=1)
+[host +  2.204] [JOIN] t=17.000 cfg UplinkDwellTime=1 DownlinkDwellTime=0 MaxEIRP=30.0dBm AntennaGain=2.2dBi TXPower idx 0..14: pwr=idx0 EIRP=30.0dBm cond=27dBm rf=22dBm(HP,CLAMPED) | pwr=idx14 EIRP=2.0dBm cond=-1dBm rf=-1dBm(LP)
+[host +  2.204] [JOIN] t=17.000 cfg ADR_ACK_LIMIT=64 ADR_ACK_DELAY=32 NbTrans=1 RX1Delay=1000ms JoinAcceptDelay1=5000ms RX2=923.300MHz/DR8(SF12/500) RX1DROffset=0 PA cfg=LP+HP (LPmax=15 HPmax=22 dBm)
+[host +  2.204] 17s004:TX on freq 916800000 Hz at DR 2
+[host +  2.204] [JOIN] t=17.006 JoinRequest DevEUI=0080E1150530F717 JoinEUI=0101010101010101 DevNonce=1 ch=8 f=916.800MHz DR2(SF10/125) pwr=idx0 EIRP=30.0dBm cond=27dBm rf=22dBm(HP,CLAMPED) ToA=371ms ULdwell=1
+[host +  2.404] 17s376:MAC txDone
+[host +  7.410] 22s356:RX_1 on freq 923300000 Hz at DR 10
+[host +  7.611] 22s407:IRQ_RX_TX_TIMEOUT
+[host +  7.611] 22s407:MAC rxTimeOut
+[host +  8.411] 23s368:RX_2 on freq 923300000 Hz at DR 8
+[host +  8.612] 23s435:IRQ_RX_TX_TIMEOUT
+[host +  8.612] 23s435:MAC rxTimeOut
+[host +  8.612] [JOIN] t=23.437 result=FAILED (no valid Join-Accept) mode=OTAA DR2(SF10/125)
+[host +  8.612] 
+[host +  8.612] ###### = JOIN FAILED
+[host +  8.612] ###### U/L FRAME:JOIN | DR:2 | PWR:0
+[host + 17.222] 32s007:TX on freq 917800000 Hz at DR 2
+[host + 17.222] [JOIN] t=32.009 JoinRequest DevEUI=0080E1150530F717 JoinEUI=0101010101010101 DevNonce=2 ch=13 f=917.800MHz DR2(SF10/125) pwr=idx0 EIRP=30.0dBm cond=27dBm rf=22dBm(HP,CLAMPED) ToA=371ms ULdwell=1
+[host + 17.422] 32s379:MAC txDone
+[host + 22.429] 37s359:RX_1 on freq 926300000 Hz at DR 10
+[host + 22.629] 37s464:MAC rxDone
+[host + 22.629] [JOIN] t=37.467 JoinAccept in RX1 rssi=-52 snr=8: DevAddr=0146BD4D NetID=000000 DLSettings=0x0C (RX1DROffset=0 RX2DataRate=DR12(SF8/500)) RxDelay=1(1s) CFList=absent
+[host + 22.629] [JOIN] t=37.467 after Join-Accept: ChMask=FF00.0000.0000.0000.0002 ch=8-15,65
+[host + 22.629] [JOIN] t=37.468 result=JOINED mode=OTAA DevAddr=0146BD4D DR2(SF10/125) TXPower=0 RX2=923.300MHz/DR12(SF8/500) RX1Delay=1000ms RX1DROffset=0 ChMask=FF00.0000.0000.0000.0002
+[host + 22.629] 
+[host + 22.629] ###### = JOINED = OTAA =====================
+[host + 22.629] ###### U/L FRAME:JOIN | DR:2 | PWR:0
+[host + 22.629] ###### MCRootKey:   7D:F7:6B:0C:1A:B8:99:B3:3E:42:F0:47:B9:1B:54:6F
+[host + 22.629] ###### MCKEKey:     8C:B8:66:5E:0C:0E:0B:64:5B:2E:D9:E4:8A:19:27:7C
+[host + 22.629] ###### AppSKey:     FB:21:97:28:69:35:D9:CA:A6:5F:C0:69:96:BB:DD:14
+[host + 22.629] ###### NwkSKey:     A2:A1:52:88:AA:FB:03:21:91:5C:3B:F7:24:79:E3:1C
+[host + 22.629] ###### DBIntKey:    7A:C4:7C:65:FE:25:9B:B6:54:BD:26:35:19:F8:9C:8E
+[host + 22.629] ###### DevEUI:      00:80:E1:15:05:30:F7:17
+[host + 22.629] ###### AppEUI:      01:01:01:01:01:01:01:01
+[host + 22.629] ###### DevAddr:     01:46:BD:4D
+[host + 32.041] 47s010:VDDA: 254
+[host + 32.041] 47s010:temp: 27
+[host + 32.041] 47s011:TX on freq 918000000 Hz at DR 2
+[host + 32.241] [UL] t=47.013 FCnt=1 UNCONF port=2 len=5 tx=1/1 ch=14 f=918.000MHz DR2(SF10/125) pwr=idx0 EIRP=30.0dBm cond=27dBm rf=22dBm(HP,CLAMPED) ToA=330ms ADR=1 ADRACKReq=0 ACK=0 ADR_ACK_CNT=0/64+32 ULdwell=1
+[host + 32.241] 47s014:SEND REQUEST
+[host + 32.441] 47s343:MAC txDone
+[host + 33.442] 48s323:RX_1 on freq 926900000 Hz at DR 10
+[host + 33.643] 48s438:MAC rxDone
+[host + 33.643] [DL] t=48.440 RX1 DR10(SF10/500) rssi=-52 snr=7 CONF FCntDown=1 DevAddr=0146BD4D FPort=0 FRMPayload=10B FOptsLen=0 ACK=0 ADR=0 FPending=0 ADR_ACK_CNT=0->0
+[host + 33.643] [MAC] t=48.441 RX 10 byte(s) of MAC commands in RX1 (snr=7), 2 parsable cmd(s): 0320020071032000FF01
+[host + 33.643] [MAC] t=48.441   LinkADRReq [block 1, cmd 1/2] raw=0320020071 DataRate=DR2(SF10/125) TXPower=0(EIRP 30.0dBm) ChMask=0x0002 ChMaskCntl=7 NbTrans=1
+[host + 33.643] [MAC] t=48.441   LinkADRReq [block 1, cmd 2/2] raw=032000FF01 DataRate=DR2(SF10/125) TXPower=0(EIRP 30.0dBm) ChMask=0xFF00 ChMaskCntl=0 NbTrans=1
+[host + 33.643] [ADR] t=48.442 LinkADRReq block of 2 cmd(s) -> LinkADRAns status=0x07 (PowerACK=1 DataRateACK=1 ChMaskACK=1) x2 => APPLIED: DR2(SF10/125)->DR2(SF10/125) TXPower 0->0 NbTrans 1->1 ChMask(now)=FF00.0000.0000.0000.0002 ch=8-15,65
+[host + 33.643] [MAC] t=48.442 queue LinkADRAns (CID 0x03) payload=07 [PowerACK=1 DataRateACK=1 ChMaskACK=1]
+[host + 33.643] [MAC] t=48.442 queue LinkADRAns (CID 0x03) payload=07 [PowerACK=1 DataRateACK=1 ChMaskACK=1]
+[host + 33.643] [UL] t=48.442 done FCnt=1 status=OK DR2(SF10/125) pwrIdx=0 ch=14 | MIB now: ADR=1 DR2(SF10/125) TXPower=0 NbTrans=1 ChMask=FF00.0000.0000.0000.0002
+[host + 33.643] 
+[host + 33.643] ###### ========== MCPS-Confirm =============
+[host + 33.643] ###### U/L FRAME:0001 | PORT:2 | DR:2 | PWR:0 | MSG TYPE:UNCONFIRMED
+[host + 33.643] ###### D/L FRAME:0001 | PORT:0 | DR:10 | SLOT:1 | RSSI:-52 | SNR:7
+[host + 33.643] 48s447:TX on freq 917600000 Hz at DR 2
+[host + 33.643] [UL] t=48.449 FCnt=2 UNCONF port=0 len=4 tx=1/1 ch=12 f=917.600MHz DR2(SF10/125) pwr=idx0 EIRP=30.0dBm cond=27dBm rf=22dBm(HP,CLAMPED) ToA=330ms ADR=1 ADRACKReq=0 ACK=1 ADR_ACK_CNT=0/64+32 ULdwell=1 (FPort 0 = MAC cmds only, see [MAC] queue lines)
+[host + 33.843] 48s779:MAC txDone
+[host + 34.844] 49s758:RX_1 on freq 925700000 Hz at DR 10
+[host + 34.844] 49s809:IRQ_RX_TX_TIMEOUT
+[host + 34.844] 49s809:MAC rxTimeOut
+[host + 35.845] 50s755:RX_2 on freq 923300000 Hz at DR 12
+[host + 35.845] 50s798:IRQ_RX_TX_TIMEOUT
+[host + 35.845] 50s798:MAC rxTimeOut
+[host + 35.845] [UL] t=50.800 done FCnt=2 status=OK DR2(SF10/125) pwrIdx=0 ch=12 | MIB now: ADR=1 DR2(SF10/125) TXPower=0 NbTrans=1 ChMask=FF00.0000.0000.0000.0002
+[host + 35.845] 
+[host + 35.845] ###### ========== MCPS-Confirm =============
+[host + 36.046] ###### U/L FRAME:0002 | PORT:0 | DR:2 | PWR:0 | MSG TYPE:UNCONFIRMED
+[host + 47.059] 62s015:VDDA: 254
+[host + 47.059] 62s015:temp: 27
+[host + 47.059] 62s016:TX on freq 918200000 Hz at DR 2
+[host + 47.259] [UL] t=62.018 FCnt=3 UNCONF port=2 len=5 tx=1/1 ch=15 f=918.200MHz DR2(SF10/125) pwr=idx0 EIRP=30.0dBm cond=27dBm rf=22dBm(HP,CLAMPED) ToA=330ms ADR=1 ADRACKReq=0 ACK=0 ADR_ACK_CNT=1/64+32 ULdwell=1
+[host + 47.259] 62s019:SEND REQUEST
+[host + 47.460] 62s348:MAC txDone
+[host + 48.461] 63s328:RX_1 on freq 927500000 Hz at DR 10
+[host + 48.461] 63s378:IRQ_RX_TX_TIMEOUT
+[host + 48.461] 63s378:MAC rxTimeOut
+[host + 49.462] 64s325:RX_2 on freq 923300000 Hz at DR 12
+[host + 49.462] 64s368:IRQ_RX_TX_TIMEOUT
+[host + 49.462] 64s368:MAC rxTimeOut
+[host + 49.462] [UL] t=64.370 done FCnt=3 status=OK DR2(SF10/125) pwrIdx=0 ch=15 | MIB now: ADR=1 DR2(SF10/125) TXPower=0 NbTrans=1 ChMask=FF00.0000.0000.0000.0002
+[host + 49.462] 
+[host + 49.462] ###### ========== MCPS-Confirm =============
+[host + 49.462] ###### U/L FRAME:0003 | PORT:2 | DR:2 | PWR:0 | MSG TYPE:UNCONFIRMED
+[host + 62.078] 77s020:VDDA: 254
+[host + 62.078] 77s020:temp: 28
+[host + 62.078] 77s021:TX on freq 917200000 Hz at DR 2
+[host + 62.078] [UL] t=77.023 FCnt=4 UNCONF port=2 len=5 tx=1/1 ch=10 f=917.200MHz DR2(SF10/125) pwr=idx0 EIRP=30.0dBm cond=27dBm rf=22dBm(HP,CLAMPED) ToA=330ms ADR=1 ADRACKReq=0 ACK=0 ADR_ACK_CNT=2/64+32 ULdwell=1
+[host + 62.078] 77s024:SEND REQUEST
+[host + 62.479] 77s353:MAC txDone
+[host + 63.480] 78s333:RX_1 on freq 924500000 Hz at DR 10
+[host + 63.480] 78s383:IRQ_RX_TX_TIMEOUT
+[host + 63.480] 78s383:MAC rxTimeOut
+[host + 64.481] 79s330:RX_2 on freq 923300000 Hz at DR 12
+[host + 64.481] 79s373:IRQ_RX_TX_TIMEOUT
+[host + 64.481] 79s373:MAC rxTimeOut
+[host + 64.481] [UL] t=79.375 done FCnt=4 status=OK DR2(SF10/125) pwrIdx=0 ch=10 | MIB now: ADR=1 DR2(SF10/125) TXPower=0 NbTrans=1 ChMask=FF00.0000.0000.0000.0002
+[host + 64.481] 
+[host + 64.481] ###### ========== MCPS-Confirm =============
+[host + 64.481] ###### U/L FRAME:0004 | PORT:2 | DR:2 | PWR:0 | MSG TYPE:UNCONFIRMED
