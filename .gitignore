@@ -1,5 +1,6 @@
 # Stakeholder material and AI working files (DIRECTIVES.md rule 13)
 ai-content/
+knowledge-base/perguntas-stakeholder.html
 
 # STM32CubeWL clones, re-fetched by firmware/tools/assemble_from_cube.sh
 third_party/

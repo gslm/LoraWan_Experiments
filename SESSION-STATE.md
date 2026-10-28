@@ -7,7 +7,11 @@ Last updated: 2026-10-27
 - Operator runs all commands on the gateway serial console. Claude may SSH into the gateway only after it is on the 28 subnet.
 - Workspace renamed from SENSE-LoraWan to LoraWan_Experiments (done 2026-10-27).
 - GitHub repo: https://github.com/gslm/LoraWan_Experiments (PUBLIC, empty, created by operator).
-- Primer exported (names scrubbed) to knowledge-base/lorawan-adr-lab-primer.md; the 2 widgets became text placeholders.
+- Primer lives as knowledge-base/lorawan-adr-lab-primer.html only (operator deleted the .md on 2026-10-28).
+- 2026-10-28: knowledge-base/lsm110a-module.html (module primer, versioned, no names) and perguntas-stakeholder.html
+  (pt-BR, names allowed, git-ignored) written for the 14:00 meeting.
+- LSM110A facts (vendor GitHub Support-SJI/LSM110A): board file HP only for __DEV_LSM110A__; block diagram has one TX path;
+  SDK MW 2.4.0 (readme says 2.3.0); default region US915, hybrid off; never full-erase (Sigfox ID/PAC at 0x0803E000).
 - .gitignore at repo root. SESSION-STATE.md and DIRECTIVES.md are versioned (gateway creds are factory defaults, IP is local only). firmware/backup/ stays on disk, not versioned.
 - TEMPORARY: chirpstack/ (upstream chirpstack-docker + our changes) is committed as plain files. Its upstream .git was moved to ai-content/chirpstack-upstream.git. Target later: a submodule plus deploy scripts that assemble the working tree.
 - Versioned content must never contain stakeholder names (customer or consultancy). Primer export to knowledge-base/ drops both names and the customer's certification report section.
