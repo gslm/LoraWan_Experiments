@@ -45,6 +45,10 @@ Last updated: 2026-10-27
   3) status checks (gateway seen in ChirpStack = UDP 1700 passes ufw)  4) reset board, watch for Join-Accept.
 - gateway/watch-board.py: live view of board uplinks + last LinkADRReq, on the gateway (NS mode only). Tested.
   Gateway's local API needs no token over http://127.0.0.1; /api/lora/packets/up ignores limit (returns ~100, newest first).
+- knowledge-base/gateway-configuration.html (gateway setup explainer, 6 SVGs, capture example) written; lorawan-glossary.html
+  (from another agent) had "TE" replaced by "Stakeholder" (6x). Both untracked. Glossary still has em-dashes/arrows (directive 9), not fixed.
+- Board left running overnight (safe: gateway logs in RAM with rotation, NS packet DB trimmed to 100 rows).
+- TOMORROW: STM32 code.
 - FUTURE: terminal app showing board TX (ttyACM2 trace), gateway RX (SSH syslog), ChirpStack ADR (MQTT) side by side.
 - Later: replace the vendored chirpstack/ with a submodule + deploy scripts.
 - Goal 2: simple STM32WL55 app on the board (/dev/ttyACM2) to explore ADR via the gateway.
