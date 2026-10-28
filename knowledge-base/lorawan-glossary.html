@@ -1,0 +1,412 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>LoRaWAN Glossary — ADR / AU915 / STM32WL</title>
+<style>
+:root{color-scheme:dark;--bg:#161614;--ink:#ecebe7;--quiet:#a9a69e;--rule:#3a3935;--head:#24231f;--cap:#1b1a18;--link:#7db2f5}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
+main{max-width:860px;margin:0 auto;padding:32px 16px 64px}
+h1{font-size:28px;line-height:1.25;margin:0 0 4px}
+h1+p{color:var(--quiet);margin-top:0}
+h2{font-size:21px;margin:44px 0 12px;padding-top:12px;border-top:1px solid var(--rule)}
+table{border-collapse:collapse;width:100%;font-size:14.5px;margin:12px 0 20px}
+th,td{border:1px solid var(--rule);padding:7px 10px;vertical-align:top;text-align:left}
+th{background:var(--head)}
+td:first-child{white-space:nowrap;font-weight:600}
+@media (max-width:640px){td:first-child{white-space:normal}}
+figure{margin:24px 0 8px;border:1px solid var(--rule);border-radius:10px;overflow:hidden}
+figure svg{display:block;width:100%;height:auto}
+figcaption{font-size:13px;color:var(--quiet);padding:8px 12px;border-top:1px solid var(--rule);background:var(--cap)}
+a{color:var(--link)}
+code{background:var(--head);padding:1px 4px;border-radius:4px}
+</style></head><body><main><h1>LoRaWAN Glossary — ADR / AU915 / STM32WL</h1>
+<p>Oct 27, 2026</p>
+<h2>The big picture</h2>
+<p>A LoRaWAN device never talks to a server directly: its radio packets reach one or more gateways, the gateways forward them over the internet to a network server, and the network server hands the data to the application. ADR lives in the network server: it watches the signal quality of the device&#39;s uplinks and sends back MAC commands telling the device which data rate and TX power to use.</p>
+<p>Stakeholder&#39;s problem sits on the link between the device&#39;s firmware (ST&#39;s stack on the STM32WLE5) and the network server (ChirpStack vs. TTN). Terms below are grouped by layer; the ones that matter most for the ADR investigation are marked <strong>(ADR)</strong>.</p>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 236" role="img" aria-label="ADR is decided in the network server and applied by the device" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><defs><marker id="adr-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7c7970"></path></marker></defs><text x="24" y="30" font-size="15" font-weight="600" fill="#ecebe7">ADR is decided in the network server and applied by the device</text><text x="280" y="62" text-anchor="middle" font-size="11.5" fill="#a9a69e">uplink: sensor data + ADR bit (gateway adds RSSI and SNR)</text><g fill="none" stroke="#7c7970" stroke-width="1.25"><path d="M168 110H208" marker-end="url(#adr-arrow)"></path><path d="M352 110H392" marker-end="url(#adr-arrow)"></path><path d="M536 110H576" marker-end="url(#adr-arrow)"></path><path d="M464 146V190H96V146" marker-end="url(#adr-arrow)"></path></g><g><rect x="24" y="74" width="144" height="72" rx="8" fill="none" fill-opacity="1" stroke="#7c7970" stroke-width="1.25"></rect><text x="96" y="98" text-anchor="middle" font-weight="600" fill="#ecebe7">End device</text><text x="96" y="116" text-anchor="middle" font-size="11.5" fill="#a9a69e">STM32WLE5</text><text x="96" y="132" text-anchor="middle" font-size="11.5" fill="#a9a69e">ST LoRaWAN stack</text></g><g><rect x="208" y="74" width="144" height="72" rx="8" fill="none" fill-opacity="1" stroke="#7c7970" stroke-width="1.25"></rect><text x="280" y="98" text-anchor="middle" font-weight="600" fill="#ecebe7">Gateway</text><text x="280" y="116" text-anchor="middle" font-size="11.5" fill="#a9a69e">radio to internet</text><text x="280" y="132" text-anchor="middle" font-size="11.5" fill="#a9a69e">no ADR logic</text></g><g><rect x="392" y="74" width="144" height="72" rx="8" fill="#5c9df2" fill-opacity="0.12" stroke="#5c9df2" stroke-width="2"></rect><text x="464" y="98" text-anchor="middle" font-weight="600" fill="#ecebe7">Network server</text><text x="464" y="116" text-anchor="middle" font-size="11.5" fill="#ecebe7">ChirpStack or TTN</text><text x="464" y="132" text-anchor="middle" font-size="11.5" fill="#ecebe7">runs ADR</text></g><g><rect x="576" y="74" width="144" height="72" rx="8" fill="none" fill-opacity="1" stroke="#7c7970" stroke-width="1.25"></rect><text x="648" y="98" text-anchor="middle" font-weight="600" fill="#ecebe7">Application</text><text x="648" y="116" text-anchor="middle" font-size="11.5" fill="#a9a69e">receives payload</text><text x="648" y="132" text-anchor="middle" font-size="11.5" fill="#a9a69e">via MQTT or HTTP</text></g><text x="280" y="212" text-anchor="middle" font-size="11.5" fill="#a9a69e">downlink in RX1/RX2: LinkADRReq, TxParamSetupReq; device replies LinkADRAns</text></svg>
+<figcaption>ADR loop: device, gateway, network server, application</figcaption></figure>
+<p>The gateway only relays; every ADR decision comes from the network server, so swapping TTN for ChirpStack changes the commands the same firmware receives.</p>
+<h2>Network architecture</h2>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>What it means</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>End device / end node</td>
+<td>The sensor itself (Stakeholder&#39;s STM32WLE5 / LSM110A board). Battery-powered, transmits rarely.</td>
+</tr>
+<tr>
+<td>Gateway</td>
+<td>A radio receiver with an internet connection. It forwards every LoRa packet it hears to the network server and transmits downlinks back. It has no idea what the packets mean.</td>
+</tr>
+<tr>
+<td>Packet forwarder</td>
+<td>Software on the gateway that ships packets to the server. Two common flavours: Semtech UDP (legacy, simple) and LoRa Basics Station (secure, websocket).</td>
+</tr>
+<tr>
+<td>Network server (NS)</td>
+<td>The brain of the network. Deduplicates packets heard by several gateways, checks integrity, runs ADR, schedules downlinks, sends MAC commands. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>Join server (JS)</td>
+<td>Holds the root keys and approves OTAA joins. Often bundled inside the NS.</td>
+</tr>
+<tr>
+<td>Application server (AS)</td>
+<td>Decrypts the user payload and delivers it to your app (MQTT, HTTP webhook, etc.).</td>
+</tr>
+<tr>
+<td>Uplink / downlink</td>
+<td>Device → network / network → device.</td>
+</tr>
+<tr>
+<td>Class A</td>
+<td>Device listens only in two short receive windows (RX1, RX2) right after each uplink. Lowest power. Stakeholder&#39;s device is Class A, so it can only receive ADR commands right after it transmits. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>Class B / Class C</td>
+<td>B: extra scheduled receive slots synced by gateway beacons. C: receiver always on.</td>
+</tr>
+<tr>
+<td>The Things Network (TTN)</td>
+<td>A free, public, community-run LoRaWAN network running The Things Stack (TTS). You create an account and register devices on their hosted servers.</td>
+</tr>
+<tr>
+<td>The Things Stack (TTS)</td>
+<td>The network-server software behind TTN; also sold as a private/commercial product.</td>
+</tr>
+<tr>
+<td>ChirpStack</td>
+<td>An open-source LoRaWAN network server you install and run yourself (usually with Docker). No central &quot;account&quot;; every installation is private.</td>
+</tr>
+</tbody></table>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 204" role="img" aria-label="A Class A device can only hear the server right after it transmits" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><defs><marker id="cls-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7c7970"></path></marker></defs><text x="24" y="28" font-size="15" font-weight="600" fill="#ecebe7">A Class A device can only hear the server right after it transmits</text><g><line x1="24" x2="730" y1="132" y2="132" stroke="#7c7970" stroke-width="1.25" marker-end="url(#cls-arrow)"></line></g><g fill="none" stroke="#4a4843" stroke-width="1.25"><path d="M200 66V132" stroke-dasharray="3 3"></path><path d="M200 76H360" marker-end="url(#cls-arrow)"></path><path d="M200 54H520" marker-end="url(#cls-arrow)"></path></g><text x="280" y="70" text-anchor="middle" font-size="11.5" fill="#a9a69e">1 s</text><text x="440" y="48" text-anchor="middle" font-size="11.5" fill="#a9a69e">2 s</text><g><rect x="56" y="100" width="144" height="32" rx="6" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="128" y="120" text-anchor="middle" font-weight="600" fill="#ecebe7">Uplink</text><text x="128" y="154" text-anchor="middle" font-size="11.5" fill="#a9a69e">length set by the data rate</text></g><g><rect x="360" y="100" width="40" height="32" rx="6" fill="#5c9df2" fill-opacity="0.12" stroke="#5c9df2" stroke-width="2"></rect><text x="380" y="154" text-anchor="middle" font-weight="600" fill="#ecebe7">RX1</text><text x="380" y="172" text-anchor="middle" font-size="11.5" fill="#a9a69e">downlink channel</text></g><g><rect x="520" y="100" width="40" height="32" rx="6" fill="#5c9df2" fill-opacity="0.12" stroke="#5c9df2" stroke-width="2"></rect><text x="540" y="154" text-anchor="middle" font-weight="600" fill="#ecebe7">RX2</text><text x="540" y="172" text-anchor="middle" font-size="11.5" fill="#a9a69e">923.3 MHz, DR8</text></g><text x="648" y="120" text-anchor="middle" font-size="11.5" fill="#a9a69e">sleep until next uplink</text><text x="24" y="196" font-size="11.5" fill="#a9a69e">ADR commands (LinkADRReq, TxParamSetupReq) can only arrive in RX1 or RX2; the answer rides on the next uplink.</text></svg>
+<figcaption>Class A receive windows: uplink, RX1, RX2</figcaption></figure>
+<p>Because Stakeholder&#39;s device is Class A, every ADR change takes at least one uplink to deliver and another to acknowledge; a rejected command repeats on every uplink.</p>
+<h2>Radio</h2>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>What it means</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>LoRa</td>
+<td>The physical radio modulation (chirp spread spectrum) from Semtech. LoRaWAN is the network protocol on top of it.</td>
+</tr>
+<tr>
+<td>Chirp</td>
+<td>A signal sweeping up or down in frequency. LoRa encodes bits in chirps, which is why it survives very weak signals.</td>
+</tr>
+<tr>
+<td>Spreading factor (SF)</td>
+<td>SF7 to SF12. Higher SF = slower, longer airtime, more range and robustness. Each step up roughly doubles airtime.</td>
+</tr>
+<tr>
+<td>Bandwidth (BW)</td>
+<td>Width of the radio channel: 125 kHz or 500 kHz in AU915.</td>
+</tr>
+<tr>
+<td>Data rate (DR)</td>
+<td>A numbered index combining SF + BW. In AU915: DR0 = SF12/125 kHz … DR5 = SF7/125 kHz, DR6 = SF8/500 kHz. ADR changes this number. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>Airtime / time on air</td>
+<td>How long one packet occupies the channel. Drives battery use and regulatory limits.</td>
+</tr>
+<tr>
+<td>RSSI</td>
+<td>Received signal strength in dBm (e.g. −110 dBm). Raw power, includes noise.</td>
+</tr>
+<tr>
+<td>SNR</td>
+<td>Signal-to-noise ratio in dB. LoRa can decode below the noise floor (down to about −20 dB at SF12). This is the main input to ADR. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>Link margin</td>
+<td>How many dB above the decoding limit a packet arrived. Big margin = the server can speed the device up or lower its power. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>EIRP</td>
+<td>Effective radiated power = TX power + antenna gain. Regulations cap EIRP, not conducted power.</td>
+</tr>
+<tr>
+<td>TX power index</td>
+<td>Power is commanded as an index, not dBm: index 0 = max EIRP, each step = −2 dB. AU915: max EIRP 30 dBm, index 0–14. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>Duty cycle</td>
+<td>Limit on the fraction of time a device may transmit. Strict in Europe; not the binding limit in AU915/Brazil.</td>
+</tr>
+<tr>
+<td>Dwell time</td>
+<td>Maximum time a single transmission may occupy one channel. In AU915 an optional 400 ms limit exists; when on, SF11/SF12 (DR0/DR1) are forbidden. <strong>(ADR)</strong></td>
+</tr>
+</tbody></table>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 252" role="img" aria-label="ADR moves the device along this ladder of data rates" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><defs><marker id="dr-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7c7970"></path></marker></defs><text x="24" y="28" font-size="15" font-weight="600" fill="#ecebe7">ADR moves the device along this ladder of AU915 data rates</text><g><rect x="28" y="62" width="204" height="92" rx="10" fill="#f2b84b" fill-opacity="0.10" stroke="#f2b84b" stroke-width="1.25" stroke-dasharray="5 4"></rect><text x="28" y="54" font-size="11.5" fill="#ecebe7">blocked when the 400 ms dwell time is on (ST stack default for AU915)</text></g><g><g><rect x="36" y="72" width="88" height="72" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect></g><g><rect x="136" y="72" width="88" height="72" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect></g><g><rect x="236" y="72" width="88" height="72" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect></g><g><rect x="336" y="72" width="88" height="72" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect></g><g><rect x="436" y="72" width="88" height="72" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect></g><g><rect x="536" y="72" width="88" height="72" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect></g><g><rect x="636" y="72" width="88" height="72" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect></g></g><text x="80" y="96" text-anchor="middle" font-weight="600" fill="#ecebe7">DR0</text><text x="80" y="114" text-anchor="middle" font-size="11.5" fill="#a9a69e">SF12/125</text><text x="80" y="130" text-anchor="middle" font-size="11.5" fill="#a9a69e">-20 dB</text><text x="180" y="96" text-anchor="middle" font-weight="600" fill="#ecebe7">DR1</text><text x="180" y="114" text-anchor="middle" font-size="11.5" fill="#a9a69e">SF11/125</text><text x="180" y="130" text-anchor="middle" font-size="11.5" fill="#a9a69e">-17.5 dB</text><text x="280" y="96" text-anchor="middle" font-weight="600" fill="#ecebe7">DR2</text><text x="280" y="114" text-anchor="middle" font-size="11.5" fill="#a9a69e">SF10/125</text><text x="280" y="130" text-anchor="middle" font-size="11.5" fill="#a9a69e">-15 dB</text><text x="380" y="96" text-anchor="middle" font-weight="600" fill="#ecebe7">DR3</text><text x="380" y="114" text-anchor="middle" font-size="11.5" fill="#a9a69e">SF9/125</text><text x="380" y="130" text-anchor="middle" font-size="11.5" fill="#a9a69e">-12.5 dB</text><text x="480" y="96" text-anchor="middle" font-weight="600" fill="#ecebe7">DR4</text><text x="480" y="114" text-anchor="middle" font-size="11.5" fill="#a9a69e">SF8/125</text><text x="480" y="130" text-anchor="middle" font-size="11.5" fill="#a9a69e">-10 dB</text><text x="580" y="96" text-anchor="middle" font-weight="600" fill="#ecebe7">DR5</text><text x="580" y="114" text-anchor="middle" font-size="11.5" fill="#a9a69e">SF7/125</text><text x="580" y="130" text-anchor="middle" font-size="11.5" fill="#a9a69e">-7.5 dB</text><text x="680" y="96" text-anchor="middle" font-weight="600" fill="#ecebe7">DR6</text><text x="680" y="114" text-anchor="middle" font-size="11.5" fill="#a9a69e">SF8/500</text><text x="680" y="130" text-anchor="middle" font-size="11.5" fill="#a9a69e">-10 dB</text><g><line x1="40" x2="720" y1="184" y2="184" stroke="#7c7970" stroke-width="1.25" marker-start="url(#dr-arrow)" marker-end="url(#dr-arrow)"></line></g><text x="36" y="206" font-size="11.5" fill="#a9a69e">more range, longer airtime, more battery</text><text x="724" y="206" text-anchor="end" font-size="11.5" fill="#a9a69e">less range, shorter airtime, less battery</text><text x="24" y="236" font-size="11.5" fill="#a9a69e">Third line: lowest SNR the gateway can still decode. ADR compares the measured SNR against it to pick the fastest safe rate.</text></svg>
+<figcaption>AU915 data-rate ladder, DR0 to DR6</figcaption></figure>
+<p>If the server believes dwell time is off but the device believes it is on, the server may command DR0 or DR1 and the device will reject it.</p>
+<h2>Joining and security</h2>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>What it means</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>OTAA</td>
+<td>Over-the-Air Activation. The device sends a Join-Request; the server answers with a Join-Accept and fresh session keys. The recommended method, and the ST example&#39;s default.</td>
+</tr>
+<tr>
+<td>ABP</td>
+<td>Activation By Personalization. Session keys are hard-coded; no join. Simpler but fragile (frame-counter and reset problems).</td>
+</tr>
+<tr>
+<td>DevEUI</td>
+<td>64-bit unique ID of the device, like a MAC address.</td>
+</tr>
+<tr>
+<td>JoinEUI (AppEUI in older specs)</td>
+<td>64-bit ID of the join server the device should join through. Often all zeros on ChirpStack.</td>
+</tr>
+<tr>
+<td>AppKey</td>
+<td>128-bit root key shared between device and join server. Session keys are derived from it at join.</td>
+</tr>
+<tr>
+<td>NwkSKey / AppSKey</td>
+<td>Session keys. NwkSKey signs and checks frames (MIC) and encrypts MAC commands on port 0; AppSKey encrypts the user payload. (LoRaWAN 1.1 splits the network key into three.)</td>
+</tr>
+<tr>
+<td>DevAddr</td>
+<td>32-bit short address assigned at join; used in every frame instead of the DevEUI.</td>
+</tr>
+<tr>
+<td>Frame counters (FCntUp / FCntDown)</td>
+<td>Count every uplink/downlink to block replay attacks. A device reset that rolls them back gets its packets dropped.</td>
+</tr>
+<tr>
+<td>MIC</td>
+<td>Message Integrity Code: 4-byte signature on each frame.</td>
+</tr>
+<tr>
+<td>Join-Request / Join-Accept</td>
+<td>The two OTAA messages. The Join-Accept also carries the RX settings and, for AU915, can carry a channel list.</td>
+</tr>
+</tbody></table>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 324" role="img" aria-label="One join exchange turns the AppKey into session keys" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><defs><marker id="join-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7c7970"></path></marker></defs><text x="24" y="28" font-size="15" font-weight="600" fill="#ecebe7">One OTAA join turns the AppKey into session keys</text><g stroke="#4a4843" stroke-width="1.25" stroke-dasharray="4 4"><line x1="160" x2="160" y1="92" y2="300"></line><line x1="600" x2="600" y1="92" y2="300"></line></g><g><rect x="68" y="52" width="184" height="40" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="160" y="77" text-anchor="middle" font-weight="600" fill="#ecebe7">End device</text></g><g><rect x="508" y="52" width="184" height="40" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="600" y="77" text-anchor="middle" font-weight="600" fill="#ecebe7">Network + join server</text></g><g fill="none" stroke="#7c7970" stroke-width="1.25"><line x1="160" x2="600" y1="136" y2="136" marker-end="url(#join-arrow)"></line><line x1="600" x2="160" y1="180" y2="180" marker-end="url(#join-arrow)"></line><line x1="160" x2="600" y1="280" y2="280" marker-end="url(#join-arrow)"></line></g><text x="380" y="128" text-anchor="middle" font-size="11.5" fill="#ecebe7">Join-Request: DevEUI, JoinEUI, DevNonce, signed with AppKey</text><text x="380" y="172" text-anchor="middle" font-size="11.5" fill="#ecebe7">Join-Accept: DevAddr, RX settings, channel list, AppKey-encrypted</text><g><rect x="70" y="204" width="180" height="32" rx="8" fill="#5c9df2" fill-opacity="0.12" stroke="#5c9df2" stroke-width="2"></rect><text x="160" y="224" text-anchor="middle" font-size="11.5" fill="#ecebe7">derives NwkSKey, AppSKey</text></g><g><rect x="510" y="204" width="180" height="32" rx="8" fill="#5c9df2" fill-opacity="0.12" stroke="#5c9df2" stroke-width="2"></rect><text x="600" y="224" text-anchor="middle" font-size="11.5" fill="#ecebe7">derives NwkSKey, AppSKey</text></g><text x="380" y="272" text-anchor="middle" font-size="11.5" fill="#ecebe7">Data uplinks: DevAddr + FCnt; session keys protect every frame</text></svg>
+<figcaption>OTAA join sequence: request, accept, session keys</figcaption></figure>
+<p>The AppKey itself never travels over the air; after the join, ADR state (DR, power, channel mask) resets to the region defaults.</p>
+<h2>MAC layer and ADR</h2>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>What it means</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MAC command</td>
+<td>A small control message between NS and device (not user data). Each has a request and an answer, e.g. LinkADRReq / LinkADRAns. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>FOpts / FPort 0</td>
+<td>Where MAC commands travel: piggybacked in the frame header (FOpts, max 15 bytes) or as the whole payload on port 0.</td>
+</tr>
+<tr>
+<td>ADR (Adaptive Data Rate)</td>
+<td>The NS tunes each device&#39;s DR, TX power and repetitions from its recent SNR history. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>ADR bit</td>
+<td>Flag in every uplink: 1 = &quot;the network may adjust me&quot;. If 0, the device keeps its own DR/power. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>LinkADRReq</td>
+<td>NS → device: DataRate, TXPower, ChMask, ChMaskCntl, NbTrans. Several can be chained in one downlink (AU915 needs this to set 72 channels). <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>LinkADRAns</td>
+<td>Device → NS: three ACK bits — power OK, data rate OK, channel mask OK. If any is 0, the device rejects the whole command and keeps its old settings. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>ChMask / ChMaskCntl</td>
+<td>16-bit channel on/off mask, and a control field saying which block of channels the mask applies to (or special actions, e.g. 7 = turn all 125 kHz channels off). <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>NbTrans</td>
+<td>How many times each uplink is sent (1–15). The NS raises it on lossy links. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>0xF &quot;keep&quot; value</td>
+<td>In LoRaWAN 1.0.4, DataRate or TXPower = 15 means &quot;don&#39;t change this field&quot;. Older stacks may reject it. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>ADRACKReq</td>
+<td>Bit the device sets when it hasn&#39;t heard any downlink for a while, asking the NS to prove it&#39;s still there. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>ADR_ACK_LIMIT / ADR_ACK_DELAY</td>
+<td>Defaults 64 and 32 uplinks. After LIMIT uplinks with no downlink the device sets ADRACKReq; after DELAY more, it starts backing off. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>ADR backoff</td>
+<td>Device self-rescue: back to max power first, then step the DR down one at a time until it hears the network again. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>Installation margin</td>
+<td>Safety dB the NS keeps when computing ADR. ChirpStack default: 10 dB. Smaller = more aggressive. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>TxParamSetupReq</td>
+<td>NS → device: sets dwell time (on/off, up and down) and max EIRP. Only in regions that support it, including AU915. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>NewChannelReq / DlChannelReq</td>
+<td>Add a channel / change a downlink frequency. Not used in AU915 (fixed channel plan).</td>
+</tr>
+<tr>
+<td>DevStatusReq</td>
+<td>NS asks battery level and downlink SNR.</td>
+</tr>
+<tr>
+<td>LinkCheckReq</td>
+<td>Device asks &quot;am I heard, and with what margin?&quot;</td>
+</tr>
+</tbody></table>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 344" role="img" aria-label="The device applies a LinkADRReq only if all three checks pass" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><defs><marker id="lar-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7c7970"></path></marker></defs><text x="24" y="30" font-size="15" font-weight="600" fill="#ecebe7">The device applies a LinkADRReq only if all three checks pass</text><g fill="none" stroke="#7c7970" stroke-width="1.25"><path d="M184 110H212" marker-end="url(#lar-arrow)"></path><path d="M372 110H412" marker-end="url(#lar-arrow)"></path><path d="M540 110H572" marker-end="url(#lar-arrow)"></path><path d="M476 150V216" marker-end="url(#lar-arrow)"></path><path d="M396 252H184" marker-end="url(#lar-arrow)"></path><path d="M104 216V138" marker-end="url(#lar-arrow)"></path></g><g><rect x="24" y="82" width="160" height="56" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="104" y="107" text-anchor="middle" font-weight="600" fill="#ecebe7">LinkADRReq</text><text x="104" y="125" text-anchor="middle" font-size="11.5" fill="#a9a69e">arrives in RX1/RX2</text></g><g><rect x="212" y="82" width="160" height="56" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="292" y="107" text-anchor="middle" font-size="11.5" fill="#ecebe7">Check channel mask,</text><text x="292" y="125" text-anchor="middle" font-size="11.5" fill="#ecebe7">data rate, TX power</text></g><g><polygon points="412,110 476,70 540,110 476,150" fill="none" stroke="#7c7970" stroke-width="1.25"></polygon><text x="476" y="114" text-anchor="middle" fill="#ecebe7">All three OK?</text></g><g><rect x="572" y="82" width="160" height="56" rx="8" fill="#5c9df2" fill-opacity="0.12" stroke="#5c9df2" stroke-width="2"></rect><text x="652" y="107" text-anchor="middle" font-weight="600" fill="#ecebe7">Apply all three</text><text x="652" y="125" text-anchor="middle" font-size="11.5" fill="#ecebe7">LinkADRAns = 1 1 1</text></g><g><rect x="396" y="216" width="160" height="72" rx="8" fill="#f2b84b" fill-opacity="0.10" stroke="#f2b84b" stroke-width="2"></rect><text x="476" y="240" text-anchor="middle" font-weight="600" fill="#ecebe7">Reject everything</text><text x="476" y="258" text-anchor="middle" font-size="11.5" fill="#ecebe7">keep old DR, power, mask</text><text x="476" y="274" text-anchor="middle" font-size="11.5" fill="#ecebe7">failed bit = 0 in the Ans</text></g><g><rect x="24" y="216" width="160" height="72" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="104" y="240" text-anchor="middle" font-weight="600" fill="#ecebe7">Server reacts</text><text x="104" y="258" text-anchor="middle" font-size="11.5" fill="#ecebe7">fixes the request, or</text><text x="104" y="274" text-anchor="middle" font-size="11.5" fill="#ecebe7">resends the same one</text></g><text x="558" y="102" text-anchor="middle" font-size="11.5" fill="#a9a69e">yes</text><text x="486" y="176" font-size="11.5" fill="#a9a69e">no</text><text x="290" y="244" text-anchor="middle" font-size="11.5" fill="#a9a69e">Ans rides on the next uplink</text><text x="114" y="185" font-size="11.5" fill="#a9a69e">a resend starts the loop again</text><text x="24" y="328" font-size="11.5" fill="#a9a69e">Common rejection causes: a data rate below the device minimum (dwell time on), fewer than 2 channels left, wrong sub-band.</text></svg>
+<figcaption>LinkADRReq handling in the device: all-or-nothing</figcaption></figure>
+<p>This loop is a plausible shape for Stakeholder&#39;s &quot;undesired behaviour&quot;: a server and device that disagree on one rule keep exchanging the same rejected command.</p>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 244" role="img" aria-label="A device that stops hearing the server slowly falls back to safer settings" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><text x="24" y="28" font-size="15" font-weight="600" fill="#ecebe7">A device that stops hearing the server falls back to safer settings</text><g><rect x="40" y="112" width="256" height="32" rx="6" fill="#2c2b28" stroke="#4a4843" stroke-width="1.25"></rect><text x="168" y="132" text-anchor="middle" font-size="11.5" fill="#ecebe7">normal: DR and power as commanded</text></g><g><rect x="296" y="112" width="128" height="32" rx="6" fill="#f2b84b" fill-opacity="0.12" stroke="#f2b84b" stroke-width="1.25"></rect><text x="360" y="132" text-anchor="middle" font-size="11.5" fill="#ecebe7">ADRACKReq bit set</text></g><g><line x1="40" x2="724" y1="152" y2="152" stroke="#7c7970" stroke-width="1.25"></line><line x1="40" x2="40" y1="152" y2="158" stroke="#7c7970"></line><line x1="296" x2="296" y1="152" y2="158" stroke="#7c7970"></line></g><g><path d="M424 143l9 9l-9 9l-9 -9z" fill="#5c9df2"></path><path d="M552 143l9 9l-9 9l-9 -9z" fill="#5c9df2"></path><path d="M680 143l9 9l-9 9l-9 -9z" fill="#5c9df2"></path></g><text x="424" y="98" text-anchor="middle" font-size="11.5" font-weight="600" fill="#ecebe7">TX power to max</text><text x="552" y="98" text-anchor="middle" font-size="11.5" font-weight="600" fill="#ecebe7">DR down one</text><text x="680" y="98" text-anchor="middle" font-size="11.5" font-weight="600" fill="#ecebe7">DR down one ...</text><text x="40" y="178" text-anchor="middle" font-size="11.5" fill="#a9a69e">0</text><text x="296" y="178" text-anchor="middle" font-size="11.5" fill="#a9a69e">64</text><text x="424" y="178" text-anchor="middle" font-size="11.5" fill="#a9a69e">96</text><text x="552" y="178" text-anchor="middle" font-size="11.5" fill="#a9a69e">128</text><text x="680" y="178" text-anchor="middle" font-size="11.5" fill="#a9a69e">160</text><text x="724" y="194" text-anchor="end" font-size="11.5" fill="#a9a69e">uplinks since last downlink</text><text x="24" y="210" font-size="11.5" fill="#a9a69e">Any downlink resets the count to 0. Steps repeat every 32 uplinks (ADR_ACK_DELAY) after the first 64 (ADR_ACK_LIMIT),</text><text x="24" y="228" font-size="11.5" fill="#a9a69e">down to the lowest allowed DR (DR2 when dwell time is on); then the default channels are re-enabled.</text></svg>
+<figcaption>ADR backoff with LoRaWAN 1.0.4 defaults</figcaption></figure>
+<p>On AU915 the last step matters: re-enabling all 72 channels sends the device off the gateway&#39;s sub-band until the server re-sends the mask.</p>
+<h2>Regional parameters, AU915 and Brazil</h2>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>What it means</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Regional Parameters (RP002)</td>
+<td>LoRa Alliance document defining, per region, the channels, DRs, power limits and MAC-command details. Revisions (1.0.1, 1.0.3, 1.0.4…) differ in small but ADR-relevant ways.</td>
+</tr>
+<tr>
+<td>AU915</td>
+<td>The 915–928 MHz plan used in Brazil, Australia and much of South America. 64 × 125 kHz uplink channels (915.2–927.8 MHz), 8 × 500 kHz uplink channels, 8 downlink channels (923.3–927.5 MHz).</td>
+</tr>
+<tr>
+<td>US915</td>
+<td>Same channel structure but 902–928 MHz; not allowed in Brazil.</td>
+</tr>
+<tr>
+<td>Sub-band / FSB</td>
+<td>A block of 8 × 125 kHz channels + one 500 kHz channel. AU915 has 8 sub-bands. Most gateways listen to only one, so device and server must agree on it. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>FSB1 vs FSB2</td>
+<td>ChirpStack&#39;s default AU915 config (au915_0) is sub-band 1, channels 0–7 + 64. TTN uses sub-band 2, channels 8–15 + 65. Mixing them breaks joins and ADR. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>Hybrid mode</td>
+<td>Device firmware option that enables only one sub-band from boot. In ST&#39;s legacy stack: HYBRID_ENABLED (default 0 = all 72 channels on until the NS sends a mask).</td>
+</tr>
+<tr>
+<td>Channel mask negotiation</td>
+<td>After join, the NS sends chained LinkADRReq (ChMaskCntl 7, then blocks 0–3) to restrict the device to the gateway&#39;s sub-band. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>400 ms dwell time in AU915</td>
+<td>Optional limit (from Australian rules). Both ST stacks boot with uplink dwell ON (min DR = DR2, max payload at DR2 ≈ 11 bytes). It is switched only by TxParamSetupReq. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>Brazil and dwell time</td>
+<td>Brazilian networks are generally run without the 400 ms limit (worth confirming against the current Anatel rules). TTN has Brazil-specific plans (e.g. AU_915_928_FSB_2_BR, &quot;dwell time disabled&quot;) that tell the device so. ChirpStack&#39;s AU915 configs default to dwell off. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>RX1 / RX2</td>
+<td>The two Class A receive windows: RX1 at 1 s after the uplink on a mapped downlink channel; RX2 at 2 s on a fixed frequency (AU915: 923.3 MHz, DR8). MAC commands arrive here.</td>
+</tr>
+<tr>
+<td>RX1 DR offset</td>
+<td>How much lower/higher the downlink DR is versus the uplink DR.</td>
+</tr>
+</tbody></table>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 300" role="img" aria-label="Device and server must agree on which AU915 sub-band the gateway hears" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><text x="24" y="28" font-size="15" font-weight="600" fill="#ecebe7">Device and server must agree on which AU915 sub-band the gateway hears</text><text x="24" y="66" font-size="11.5" fill="#a9a69e">Uplink: 64 x 125 kHz channels in 8 sub-bands of 8, each with one extra 500 kHz channel</text><g><rect x="32" y="80" width="77" height="48" rx="6" fill="#5c9df2" fill-opacity="0.14" stroke="#5c9df2" stroke-width="2"></rect><rect x="120.00000000000125" y="80" width="77" height="48" rx="6" fill="#f28a5c" fill-opacity="0.14" stroke="#f28a5c" stroke-width="2"></rect><rect x="208.0000000000025" y="80" width="77" height="48" rx="6" fill="none" fill-opacity="1" stroke="#7c7970" stroke-width="1.25"></rect><rect x="295.9999999999975" y="80" width="77" height="48" rx="6" fill="none" fill-opacity="1" stroke="#7c7970" stroke-width="1.25"></rect><rect x="383.99999999999875" y="80" width="77" height="48" rx="6" fill="none" fill-opacity="1" stroke="#7c7970" stroke-width="1.25"></rect><rect x="472" y="80" width="77" height="48" rx="6" fill="none" fill-opacity="1" stroke="#7c7970" stroke-width="1.25"></rect><rect x="560.0000000000013" y="80" width="77" height="48" rx="6" fill="none" fill-opacity="1" stroke="#7c7970" stroke-width="1.25"></rect><rect x="648.0000000000025" y="80" width="77" height="48" rx="6" fill="none" fill-opacity="1" stroke="#7c7970" stroke-width="1.25"></rect></g><text x="70.5" y="101" text-anchor="middle" font-weight="600" fill="#ecebe7">SB1</text><text x="70.5" y="118" text-anchor="middle" font-size="10.5" fill="#a9a69e">ch 0-7</text><text x="158.50000000000125" y="101" text-anchor="middle" font-weight="600" fill="#ecebe7">SB2</text><text x="158.50000000000125" y="118" text-anchor="middle" font-size="10.5" fill="#a9a69e">ch 8-15</text><text x="246.5000000000025" y="101" text-anchor="middle" font-weight="600" fill="#ecebe7">SB3</text><text x="246.5000000000025" y="118" text-anchor="middle" font-size="10.5" fill="#a9a69e">ch 16-23</text><text x="334.4999999999975" y="101" text-anchor="middle" font-weight="600" fill="#ecebe7">SB4</text><text x="334.4999999999975" y="118" text-anchor="middle" font-size="10.5" fill="#a9a69e">ch 24-31</text><text x="422.49999999999875" y="101" text-anchor="middle" font-weight="600" fill="#ecebe7">SB5</text><text x="422.49999999999875" y="118" text-anchor="middle" font-size="10.5" fill="#a9a69e">ch 32-39</text><text x="510.5" y="101" text-anchor="middle" font-weight="600" fill="#ecebe7">SB6</text><text x="510.5" y="118" text-anchor="middle" font-size="10.5" fill="#a9a69e">ch 40-47</text><text x="598.5000000000013" y="101" text-anchor="middle" font-weight="600" fill="#ecebe7">SB7</text><text x="598.5000000000013" y="118" text-anchor="middle" font-size="10.5" fill="#a9a69e">ch 48-55</text><text x="686.5000000000025" y="101" text-anchor="middle" font-weight="600" fill="#ecebe7">SB8</text><text x="686.5000000000025" y="118" text-anchor="middle" font-size="10.5" fill="#a9a69e">ch 56-63</text><text x="32" y="144" font-size="10.5" fill="#a9a69e">915.2 MHz</text><text x="724.999999999995" y="144" text-anchor="end" font-size="10.5" fill="#a9a69e">927.8 MHz</text><g><rect x="477.499999999995" y="172" width="231.0000000000025" height="28" rx="6" fill="#2c2b28" stroke="#7c7970" stroke-width="1.25"></rect><text x="592.9999999999962" y="190" text-anchor="middle" font-size="11.5" fill="#ecebe7">8 downlink channels</text></g><text x="465.499999999995" y="184" text-anchor="end" font-size="11.5" fill="#a9a69e">Downlink 923.3-927.5 MHz (RX1); RX2 fixed at 923.3 MHz</text><g><rect x="24" y="222" width="14" height="14" rx="3" fill="#5c9df2" fill-opacity="0.14" stroke="#5c9df2" stroke-width="2"></rect><text x="46" y="233" font-size="11.5" fill="#ecebe7">SB1: ChirpStack&#x27;s default AU915 region file (au915_0)</text><rect x="400" y="222" width="14" height="14" rx="3" fill="#f28a5c" fill-opacity="0.14" stroke="#f28a5c" stroke-width="2"></rect><text x="422" y="233" font-size="11.5" fill="#ecebe7">SB2: TTN&#x27;s AU915 and Brazil plans (FSB 2)</text></g><text x="24" y="268" font-size="11.5" fill="#a9a69e">ST&#x27;s stack with HYBRID_ENABLED = 0 boots with all 72 uplink channels on;</text><text x="24" y="286" font-size="11.5" fill="#a9a69e">the server&#x27;s chained LinkADRReq must narrow it to the gateway&#x27;s sub-band.</text></svg>
+<figcaption>AU915 channel plan, to scale</figcaption></figure>
+<p>A gateway usually listens to one sub-band only, so the sub-band chosen in ChirpStack must match the gateway&#39;s radio configuration and what the device ends up using.</p>
+<h2>Specs, software and certification</h2>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>What it means</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>LoRaWAN 1.0.x / 1.1</td>
+<td>Versions of the link-layer spec (TS001). 1.0.4 is the current 1.0 line and what ST&#39;s legacy example targets; 1.1 adds roaming and split keys. The device and the NS device profile must declare the same version. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>LoRa Alliance</td>
+<td>The industry body that writes the specs and runs certification.</td>
+</tr>
+<tr>
+<td>LoRaWAN certification</td>
+<td>Lab testing that the device behaves per spec (join, MAC commands, ADR, counters, regional rules). Needed to carry the LoRaWAN Certified mark; some operators require it.</td>
+</tr>
+<tr>
+<td>LCTT</td>
+<td>LoRaWAN Certification Test Tool: the Alliance&#39;s tool for pre-certification testing in your own lab before going to an authorized test house.</td>
+</tr>
+<tr>
+<td>Pre-certification</td>
+<td>Running the certification test cases yourself first, to find failures cheaply.</td>
+</tr>
+<tr>
+<td>Device profile</td>
+<td>Settings on the NS describing a device type: MAC version, RP revision, region, class, ADR algorithm, uplink interval. A wrong profile is a classic cause of ADR trouble. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>ADR algorithm (server)</td>
+<td>Each NS has its own. ChirpStack: default, LoRa+LR-FHSS, or custom plugins. TTN: its own algorithm. Same device, different behaviour. <strong>(ADR)</strong></td>
+</tr>
+<tr>
+<td>LoRaMac-node</td>
+<td>Semtech&#39;s reference end-device stack. ST&#39;s legacy STM32WL stack (&quot;LoRaWAN v2.x&quot; middleware) is a port of LoRaMac-node 4.7.</td>
+</tr>
+<tr>
+<td>LoRa Basics Modem (LBM)</td>
+<td>Semtech&#39;s newer end-device stack. Since STM32CubeWL v1.5.0 (Feb 2026), ST ships this instead of LoRaMac-node.</td>
+</tr>
+<tr>
+<td>STM32CubeWL</td>
+<td>ST&#39;s software package for STM32WL chips: drivers, the LoRaWAN stack, and example projects such as LoRaWAN_End_Node. Current: v1.6.0 (June 2026).</td>
+</tr>
+<tr>
+<td>LmHandler</td>
+<td>The &quot;LoRaMac handler&quot; layer in ST&#39;s legacy stack: the API your application calls (join, send, ADR on/off).</td>
+</tr>
+<tr>
+<td>SubGHz_Phy</td>
+<td>ST&#39;s radio driver layer for the STM32WL&#39;s built-in Semtech radio.</td>
+</tr>
+</tbody></table>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 410" role="img" aria-label="ADR commands are parsed in the MAC and region layers of either ST stack" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><text x="24" y="28" font-size="15" font-weight="600" fill="#ecebe7">ADR commands are parsed in the MAC and region layers of either ST stack</text><text x="24" y="70" font-size="11.5" font-weight="600" fill="#ecebe7">STM32CubeWL up to v1.4.0 (LoRaMac-node 4.7)</text><text x="406" y="70" font-size="11.5" font-weight="600" fill="#ecebe7">STM32CubeWL v1.5.0 and later (LoRa Basics Modem)</text><g><rect x="24" y="84" width="330" height="40" rx="8" fill="none" fill-opacity="1" stroke="#7c7970" stroke-width="1.25"></rect><rect x="24" y="132" width="330" height="40" rx="8" fill="none" fill-opacity="1" stroke="#7c7970" stroke-width="1.25"></rect><rect x="24" y="180" width="330" height="40" rx="8" fill="#5c9df2" fill-opacity="0.12" stroke="#5c9df2" stroke-width="2"></rect><rect x="24" y="228" width="330" height="40" rx="8" fill="#5c9df2" fill-opacity="0.12" stroke="#5c9df2" stroke-width="2"></rect><rect x="24" y="276" width="330" height="40" rx="8" fill="none" fill-opacity="1" stroke="#7c7970" stroke-width="1.25"></rect></g><g><rect x="406" y="84" width="330" height="40" rx="8" fill="none" fill-opacity="1" stroke="#7c7970" stroke-width="1.25"></rect><rect x="406" y="132" width="330" height="40" rx="8" fill="none" fill-opacity="1" stroke="#7c7970" stroke-width="1.25"></rect><rect x="406" y="180" width="330" height="40" rx="8" fill="#5c9df2" fill-opacity="0.12" stroke="#5c9df2" stroke-width="2"></rect><rect x="406" y="228" width="330" height="40" rx="8" fill="#5c9df2" fill-opacity="0.12" stroke="#5c9df2" stroke-width="2"></rect><rect x="406" y="276" width="330" height="40" rx="8" fill="none" fill-opacity="1" stroke="#7c7970" stroke-width="1.25"></rect></g><text x="40" y="109" fill="#ecebe7"><tspan font-weight="600">Application </tspan><tspan dx="5" font-size="11.5" fill="#a9a69e">lora_app.c / lora_app.h</tspan></text><text x="40" y="157" fill="#ecebe7"><tspan font-weight="600">LmHandler </tspan><tspan dx="5" font-size="11.5" fill="#a9a69e">join, send, ADR on/off</tspan></text><text x="40" y="205" fill="#ecebe7"><tspan font-weight="600">MAC </tspan><tspan dx="5" font-size="11.5" fill="#ecebe7">LoRaMac.c, LoRaMacAdr.c (backoff)</tspan></text><text x="40" y="253" fill="#ecebe7"><tspan font-weight="600">Region </tspan><tspan dx="5" font-size="11.5" fill="#ecebe7">RegionAU915.c (LinkADRReq checks)</tspan></text><text x="40" y="301" fill="#ecebe7"><tspan font-weight="600">Radio driver </tspan><tspan dx="5" font-size="11.5" fill="#a9a69e">SubGHz_Phy</tspan></text><text x="422" y="109" fill="#ecebe7"><tspan font-weight="600">Application </tspan><tspan dx="5" font-size="11.5" fill="#a9a69e">LoRaWAN_End_Node_LBM</tspan></text><text x="422" y="157" fill="#ecebe7"><tspan font-weight="600">Modem API </tspan><tspan dx="5" font-size="11.5" fill="#a9a69e">smtc_modem_api</tspan></text><text x="422" y="205" fill="#ecebe7"><tspan font-weight="600">MAC </tspan><tspan dx="5" font-size="11.5" fill="#ecebe7">lr1mac (smtc_modem_core)</tspan></text><text x="422" y="253" fill="#ecebe7"><tspan font-weight="600">Region </tspan><tspan dx="5" font-size="11.5" fill="#ecebe7">region_au_915.c</tspan></text><text x="422" y="301" fill="#ecebe7"><tspan font-weight="600">Radio driver </tspan><tspan dx="5" font-size="11.5" fill="#a9a69e">SubGHz_Phy v1.4+</tspan></text><g><rect x="24" y="324" width="712" height="40" rx="8" fill="#2c2b28" stroke="#7c7970" stroke-width="1.25"></rect><text x="380" y="349" text-anchor="middle" fill="#ecebe7">STM32WLE5: Cortex-M4 + built-in sub-GHz radio (inside the LSM110A module)</text></g><text x="24" y="392" font-size="11.5" fill="#a9a69e">Highlighted layers parse and check LinkADRReq and TxParamSetupReq: the code to read first. Both boot AU915 with dwell time on.</text></svg>
+<figcaption>ST LoRaWAN firmware layers, legacy vs LBM</figcaption></figure>
+<p>Which column Stakeholder&#39;s code sits in is the first thing to ask them: projects started before February 2026 are almost certainly on the left one.</p>
+<h2>Sources</h2>
+<p>Code details above were read directly from the source trees on Oct 27, 2026.</p>
+<ul>
+<li><a href="https://github.com/STMicroelectronics/STM32CubeWL">STM32CubeWL (ST, GitHub)</a>: v1.4.0 for the legacy stack (RegionAU915.c, RegionCommon.c, lorawan_conf.h), v1.6.0 release notes for the LBM switch</li>
+<li><a href="https://github.com/STMicroelectronics/stm32-mw-lorawan-lbm">stm32-mw-lorawan-lbm (ST, GitHub)</a>: region_au_915_defs.h</li>
+<li><a href="https://github.com/chirpstack/chirpstack">ChirpStack (GitHub)</a>: region_au915_0.toml, link_adr.rs, tx_param_setup.rs, downlink/data.rs</li>
+<li><a href="https://github.com/TheThingsNetwork/lorawan-frequency-plans">TTN LoRaWAN frequency plans (GitHub)</a>: AU_915_928_FSB_2.yml and AU_915_928_FSB_2_BR.yml</li>
+<li><a href="https://www.globenewswire.com/news-release/2022/04/04/2415303/0/en/STMicroelectronics-and-SEONG-JI-INDUSTRIAL-announce-new-LPWA-module-using-STM32-wireless-microcontroller.html">ST and SEONG JI LSM110A announcement</a></li>
+</ul>
+</main></body></html>
