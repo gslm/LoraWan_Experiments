@@ -47,6 +47,8 @@ Last updated: 2026-10-27
   Gateway's local API needs no token over http://127.0.0.1; /api/lora/packets/up ignores limit (returns ~100, newest first).
 - knowledge-base/gateway-configuration.html (gateway setup explainer, 6 SVGs, capture example) written; lorawan-glossary.html
   (from another agent) had "TE" replaced by "Stakeholder" (6x). Both untracked. Glossary still has em-dashes/arrows (directive 9), not fixed.
+- knowledge-base/lorawan-adr-lab-primer.html (faithful HTML of the .md + 5 SVGs) and stm32-firmware.html (flashing + architecture,
+  10 SVGs) written. Primer's "Our bench" table still shows the morning state (DHCP staged), kept as in the .md.
 - Board left running overnight (safe: gateway logs in RAM with rotation, NS packet DB trimmed to 100 rows).
 - TOMORROW: STM32 code.
 - FUTURE: terminal app showing board TX (ttyACM2 trace), gateway RX (SSH syslog), ChirpStack ADR (MQTT) side by side.
