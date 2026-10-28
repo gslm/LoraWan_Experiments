@@ -79,6 +79,19 @@ Pre-provisioned in tenant **ChirpStack**:
 `provision.py` (python3 stdlib only) is idempotent; each run also (re)creates the application and
 profile if they are missing.
 
+For our bench, two short wrappers hold the IDs (override any of them as env vars, see each header):
+
+```bash
+# workstation
+cd /media/guilhermes/ssd/LoraWan_Experiments/chirpstack
+./register-gateway.sh status|add|remove          # Conduit, EUI 00800000a00006dd
+./register-device.sh  status|add|remove|reset    # NUCLEO-WL55JC, DevEUI 0080e1150530f717
+```
+
+`register-device.sh reset` (remove + add) clears ChirpStack's DevNonce history. Run it before
+resetting the board: our firmware restarts DevNonce at 1 on every reset (it is only saved when
+button B3 is pressed).
+
 ```bash
 # gateway + OTAA device (LoRaWAN 1.0.x AppKey; ChirpStack stores it in the "nwkKey" field)
 ./provision.py --gateway-eui 00800000a0001234 --gateway-name conduit-bench \
