@@ -1,0 +1,778 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>LoRaWAN ADR Lab Primer</title>
+<style>
+:root{color-scheme:dark;--bg:#161614;--ink:#ecebe7;--quiet:#a9a69e;--rule:#3a3935;--head:#24231f;--cap:#1b1a18;--link:#7db2f5}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
+main{max-width:860px;margin:0 auto;padding:32px 16px 64px}
+h1{font-size:28px;line-height:1.25;margin:0 0 4px}
+h1+p{color:var(--quiet);margin-top:0}
+h2{font-size:21px;margin:44px 0 12px;padding-top:12px;border-top:1px solid var(--rule)}
+h3{font-size:17px;margin:28px 0 8px}
+table{border-collapse:collapse;width:100%;font-size:14.5px;margin:12px 0 20px}
+th,td{border:1px solid var(--rule);padding:7px 10px;vertical-align:top;text-align:left}
+th{background:var(--head)}
+td:first-child{white-space:nowrap;font-weight:600}
+@media (max-width:640px){td:first-child{white-space:normal}}
+figure{margin:24px 0 8px;border:1px solid var(--rule);border-radius:10px;overflow:hidden}
+figure svg{display:block;width:100%;height:auto}
+figcaption{font-size:13px;color:var(--quiet);padding:8px 12px;border-top:1px solid var(--rule);background:var(--cap)}
+a{color:var(--link)}
+code{background:var(--head);padding:1px 4px;border-radius:4px}
+</style></head><body><main><h1>LoRaWAN ADR Lab Primer</h1>
+<p>Oct 27, 2026, Guilherme Moreira</p>
+<h2>Briefing for the customer meeting</h2>
+<p>Our best current reading: ChirpStack's default ADR pushes TX power down far faster than TTN does, and that exposes a weakness on the device's radio side that TTN reaches far more slowly, if at all. This comes from reading the source of all three stacks. It is not reproduced yet, so treat it as the leading hypothesis, not a finding.</p>
+<p><strong>What the customer asked for</strong>: their Class A end node uses an STM32WLE5 in the SJIT LSM110A module, running ST's LoRaWAN stack. ADR behaves on The Things Network but, on ChirpStack, Data Rate and TX Power changes lead to unwanted end-node behaviour. They want the root cause (firmware/stack vs server config), fixes, and confidence before LoRa Alliance certification.</p>
+<p><strong>What the code says so far</strong></p>
+<ul>
+<li><strong>The device's ADR code is Semtech's reference code.</strong> ST's stack (LoRaMac-node 4.x inside STM32CubeWL up to v1.4.0) is line-for-line Semtech on the ADR path. We found no device-side ADR bug that alone explains a ChirpStack-only symptom.</li>
+<li><strong>ChirpStack's default ADR is much more aggressive than TTN's.</strong> It uses a 10 dB margin, acts on a single uplink, and clears its history after every change. At good signal it lowers TX power by 2 steps per uplink down to index 14 (about -1 dBm). TTN uses a 15 dB margin plus a 2.5 dB penalty until it has 20 uplinks, so it moves about one step per 20 uplinks, and only while SNR stays above about 9.5 dB at SF7.</li>
+<li><strong>Low TX indices hit the STM32WL's power-amplifier structure.</strong> Indices 0-2 all clamp to 22 dBm, so the first steps change nothing. Index 6 (15 dBm) and every higher index switch from the high-power to the low-power amplifier. The LSM110A vendor code uses the high-power path only, so a build with ST's Nucleo default (both paths) on that module is a prime suspect.</li>
+<li><strong>ChirpStack then amplifies a weak link.</strong> After the device's own ADR back-off it re-imposes its stale low-power setting. It flip-flops NbTrans, and after two rejected LinkADRReq it stops sending them for the rest of the session.</li>
+<li><strong>A public report matches the symptom.</strong> An unanswered ST Community post (Aug 2026): STM32WL, ST middleware 2.5.0, AU915, ChirpStack steps power 0, 2, 5, 7, then the device stops transmitting. It is stable on TTN, and ADR off avoids it.</li>
+</ul>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 284" role="img" aria-label="The leading hypothesis, link by link" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><defs><marker id="hyp-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7c7970"></path></marker></defs><text x="24" y="28" text-anchor="start" font-size="15" fill="#ecebe7" font-weight="600">The leading hypothesis, link by link (from the code, not yet reproduced)</text><g><rect x="24" y="48" width="122" height="88" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="85.0" y="74" text-anchor="middle" font-weight="600" fill="#ecebe7">Strong signal</text><text x="85.0" y="91" text-anchor="middle" font-size="11.5" fill="#a9a69e">SNR far above</text><text x="85.0" y="108" text-anchor="middle" font-size="11.5" fill="#a9a69e">what its SF needs</text></g><g><rect x="166" y="48" width="122" height="88" rx="8" fill="#5c9df2" fill-opacity="0.12" stroke="#5c9df2" stroke-width="2"></rect><text x="227.0" y="74" text-anchor="middle" font-weight="600" fill="#ecebe7">ChirpStack ADR</text><text x="227.0" y="91" text-anchor="middle" font-size="11.5" fill="#ecebe7">-2 TX indices</text><text x="227.0" y="108" text-anchor="middle" font-size="11.5" fill="#ecebe7">on every uplink</text></g><g><rect x="308" y="48" width="122" height="88" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="369.0" y="74" text-anchor="middle" font-weight="600" fill="#ecebe7">Index 6 and up</text><text x="369.0" y="91" text-anchor="middle" font-size="11.5" fill="#a9a69e">radio switches to</text><text x="369.0" y="108" text-anchor="middle" font-size="11.5" fill="#a9a69e">the LP amplifier</text></g><g><rect x="450" y="48" width="122" height="88" rx="8" fill="#f2b84b" fill-opacity="0.10" stroke="#f2b84b" stroke-width="2"></rect><text x="511.0" y="74" text-anchor="middle" font-weight="600" fill="#ecebe7">HP-only module</text><text x="511.0" y="91" text-anchor="middle" font-size="11.5" fill="#ecebe7">board file says</text><text x="511.0" y="108" text-anchor="middle" font-size="11.5" fill="#ecebe7">LP + HP (Nucleo)</text></g><g><rect x="592" y="48" width="122" height="88" rx="8" fill="#f2b84b" fill-opacity="0.10" stroke="#f2b84b" stroke-width="2"></rect><text x="653.0" y="74" text-anchor="middle" font-weight="600" fill="#ecebe7">Uplinks lost</text><text x="653.0" y="91" text-anchor="middle" font-size="11.5" fill="#ecebe7">device looks dead</text><text x="653.0" y="108" text-anchor="middle" font-size="11.5" fill="#ecebe7">on ChirpStack</text></g><g fill="none" stroke="#7c7970" stroke-width="1.25"><path d="M146 92H164" marker-end="url(#hyp-arrow)"></path><path d="M288 92H306" marker-end="url(#hyp-arrow)"></path><path d="M430 92H448" marker-end="url(#hyp-arrow)"></path><path d="M572 92H590" marker-end="url(#hyp-arrow)"></path></g><g><rect x="166" y="162" width="264" height="60" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="298.0" y="182" text-anchor="middle" font-weight="600" fill="#ecebe7">Server lever</text><text x="298.0" y="198" text-anchor="middle" font-size="11.5" fill="#a9a69e">installation_margin 15-17.5 dB,</text><text x="298.0" y="214" text-anchor="middle" font-size="11.5" fill="#a9a69e">or an ADR plugin that caps the TX index</text></g><g><rect x="450" y="162" width="264" height="60" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="582.0" y="182" text-anchor="middle" font-weight="600" fill="#ecebe7">Device lever</text><text x="582.0" y="198" text-anchor="middle" font-size="11.5" fill="#a9a69e">check radio_board_if: which</text><text x="582.0" y="214" text-anchor="middle" font-size="11.5" fill="#a9a69e">amplifiers the module really wires</text></g><g fill="none" stroke="#7c7970" stroke-width="1.25"><path d="M227 162V138" marker-end="url(#hyp-arrow)"></path><path d="M511 162V138" marker-end="url(#hyp-arrow)"></path></g><text x="24" y="248" text-anchor="start" font-size="11.5" fill="#a9a69e">On TTN the same device steps down about once per 20 uplinks and stays on the HP amplifier (about index 0-4).</text><text x="24" y="266" text-anchor="start" font-size="11.5" fill="#a9a69e">Evidence so far: the source of all three stacks, and an unanswered ST Community report with the same pattern.</text></svg>
+<figcaption>Leading hypothesis: how stock ChirpStack ADR could silence a device that works on TTN</figcaption></figure>
+<p><strong>What to say tomorrow</strong>: the likely root cause is an interaction between ChirpStack's ADR settings and the device's RF configuration at low TX power, not a defect in ST's ADR logic. Both sides have quick levers: a higher installation margin or an ADR plugin on ChirpStack, and an RF-path check on the device. We will confirm it on our bench before committing to a root cause.</p>
+<h2>Our bench</h2>
+<p>The board already runs ST's end-node example with full ADR tracing, and it has joined. What answered was the Conduit's built-in network server, which has applied ADR twice. Local ChirpStack is running but no gateway feeds it yet.</p>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>What it is</th>
+<th>State on 2026-10-27</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>End device</td>
+<td>NUCLEO-WL55JC (STM32WL55JC), STLINK-V3E, log on /dev/ttyACM2 at 115200</td>
+<td>Flashed with <code>firmware/LoRaWAN_End_Node_ADR</code>, joined, uplink every 15 s</td>
+</tr>
+<tr>
+<td>Firmware</td>
+<td>STM32CubeWL v1.4.0 End_Node: ST LoRaWAN MW 2.6.2 (LoRaMac-node 4.7.0), L2 1.0.4, RP002-1.0.3</td>
+<td>AU915 sub-band 2, OTAA, Class A, ADR on, <code>[ADR]</code> <code>[MAC]</code> <code>[UL]</code> <code>[DL]</code> <code>[JOIN]</code> trace lines</td>
+</tr>
+<tr>
+<td>Gateway</td>
+<td>MultiTech Conduit MTCDT-210A, AEP 1.7.4, MTAC-LORA-915 card (8 channels), EUI 00800000A00006DD</td>
+<td>Built-in network server active, AU915 sub-band 2. eth0 to DHCP client is staged but not applied</td>
+</tr>
+<tr>
+<td>ChirpStack</td>
+<td>v4.20.0 in Docker on 192.168.28.86, region <code>au915_1</code>, UI on port 8080, UDP forwarder port 1700</td>
+<td>Running, device profile and app <code>adr-lab</code> created, no gateway connected</td>
+</tr>
+<tr>
+<td>TTN</td>
+<td>Your account, cluster still to pick</td>
+<td>Gateway not registered yet</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Device identity for any network server</strong>: DevEUI <code>0080E1150530F717</code>, JoinEUI <code>0101010101010101</code>, AppKey <code>2B7E151628AED2A6ABF7158809CF4F3C</code> (ST's public test key, lab use only), MAC 1.0.4, RP002-1.0.3.</p>
+<p><strong>What we have seen live</strong></p>
+<ul>
+<li><strong>The gateway's own server joined our board without registration.</strong> Its network EUI is ST's default JoinEUI, and it is configured for AU915 sub-band 2.</li>
+<li><strong>First downlink after join</strong>: a two-command LinkADRReq block. ChMaskCntl 7 enables channel 65, then ChMaskCntl 0 with mask 0xFF00 enables channels 8-15. The device answered 0x07 (all acknowledged).</li>
+<li><strong>ADR from the MultiTech server</strong>: DR2 to DR3 with TX index 0 to 1, then TX index 1 to 2. Its ADR is capped at DR3 with 3 dB steps.</li>
+<li><strong>The radio output stayed at 22 dBm the whole time.</strong> Indices 0, 1 and 2 ask for 27, 25 and 23 dBm conducted, and the high-power amplifier clamps all three to 22 dBm. The server believes it saved power; the gateway sees no change.</li>
+<li><strong>DevNonce restarts at 1 after every reset unless the NVM context was saved (ST's example saves it only on button B3).</strong> The server silently drops reused nonces, so the first join attempts after a reset fail. TS001-1.0.4 forbids reusing a DevNonce, so the customer's product must store it in flash if it joins by OTAA.</li>
+</ul>
+<p><strong>Where things are in the workspace</strong>: <code>firmware/</code> (project, README, <code>patches/adr-trace.diff</code>, backup of the teammate's Zephyr demo), <code>chirpstack/</code> (Docker stack, <code>provision.py</code>, README), <code>third_party/STM32CubeWL</code> (v1.4.0 source).</p>
+<h2>The stack, layer by layer</h2>
+<p>A LoRaWAN network has four parts: the end device, gateways, a network server, and an application. The gateway is a dumb radio relay; every MAC setting, ADR included, is decided by the network server and executed by the device, apart from the device's own ADR back-off.</p>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 412" role="img" aria-label="The LoRaWAN chain on our bench" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><defs><marker id="chain-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7c7970"></path></marker></defs><text x="24" y="28" text-anchor="start" font-size="15" fill="#ecebe7" font-weight="600">The LoRaWAN chain on our bench</text><rect x="16" y="42" width="244" height="318" rx="10" fill="none" stroke="#4a4843" stroke-width="1.25" stroke-dasharray="4 4"></rect><text x="28" y="60" text-anchor="start" font-size="11.5" fill="#a9a69e">End device: NUCLEO-WL55JC</text><g><rect x="28" y="70" width="220" height="40" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="138.0" y="87" text-anchor="middle" font-weight="600" fill="#ecebe7">lora_app.c</text><text x="138.0" y="102" text-anchor="middle" font-size="11.5" fill="#a9a69e">application</text></g><g><rect x="28" y="118" width="220" height="40" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="138.0" y="135" text-anchor="middle" font-weight="600" fill="#ecebe7">LmHandler</text><text x="138.0" y="150" text-anchor="middle" font-size="11.5" fill="#a9a69e">LoRaWAN API and packages</text></g><g><rect x="28" y="166" width="220" height="40" rx="8" fill="#5c9df2" fill-opacity="0.12" stroke="#5c9df2" stroke-width="2"></rect><text x="138.0" y="183" text-anchor="middle" font-weight="600" fill="#ecebe7">LoRaMac + RegionAU915</text><text x="138.0" y="198" text-anchor="middle" font-size="11.5" fill="#ecebe7">MAC core: LinkADRReq checks</text></g><g><rect x="28" y="214" width="220" height="40" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="138.0" y="231" text-anchor="middle" font-weight="600" fill="#ecebe7">SubGHz_Phy</text><text x="138.0" y="246" text-anchor="middle" font-size="11.5" fill="#a9a69e">radio driver</text></g><g><rect x="28" y="262" width="220" height="40" rx="8" fill="#f2b84b" fill-opacity="0.10" stroke="#f2b84b" stroke-width="2"></rect><text x="138.0" y="279" text-anchor="middle" font-weight="600" fill="#ecebe7">radio_board_if</text><text x="138.0" y="294" text-anchor="middle" font-size="11.5" fill="#ecebe7">RF switch: which amplifiers</text></g><g><rect x="28" y="310" width="220" height="40" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="138.0" y="327" text-anchor="middle" font-weight="600" fill="#ecebe7">STM32WL radio</text><text x="138.0" y="342" text-anchor="middle" font-size="11.5" fill="#a9a69e">HP up to 22 dBm, LP up to 15 dBm</text></g><rect x="286" y="150" width="196" height="210" rx="10" fill="none" stroke="#4a4843" stroke-width="1.25" stroke-dasharray="4 4"></rect><text x="298" y="168" text-anchor="start" font-size="11.5" fill="#a9a69e">Gateway: Conduit</text><g><rect x="298" y="180" width="172" height="44" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="384.0" y="198" text-anchor="middle" font-weight="600" fill="#ecebe7">Packet forwarder</text><text x="384.0" y="215" text-anchor="middle" font-size="11.5" fill="#a9a69e">Semtech UDP</text></g><g><rect x="298" y="310" width="172" height="40" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="384.0" y="327" text-anchor="middle" font-weight="600" fill="#ecebe7">Concentrator</text><text x="384.0" y="342" text-anchor="middle" font-size="11.5" fill="#a9a69e">SX1301, 8 channels</text></g><rect x="508" y="110" width="236" height="180" rx="10" fill="none" stroke="#4a4843" stroke-width="1.25" stroke-dasharray="4 4"></rect><text x="520" y="128" text-anchor="start" font-size="11.5" fill="#a9a69e">Network servers: ADR is decided here</text><g><rect x="520" y="140" width="212" height="40" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="626.0" y="157" text-anchor="middle" font-weight="600" fill="#ecebe7">MultiTech built-in</text><text x="626.0" y="172" text-anchor="middle" font-size="11.5" fill="#a9a69e">on the gateway; today</text></g><g><rect x="520" y="188" width="212" height="40" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="626.0" y="205" text-anchor="middle" font-weight="600" fill="#ecebe7">ChirpStack v4</text><text x="626.0" y="220" text-anchor="middle" font-size="11.5" fill="#a9a69e">our workstation; next</text></g><g><rect x="520" y="236" width="212" height="40" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="626.0" y="253" text-anchor="middle" font-weight="600" fill="#ecebe7">TTN (The Things Stack)</text><text x="626.0" y="268" text-anchor="middle" font-size="11.5" fill="#a9a69e">cloud; for comparison</text></g><g fill="none" stroke="#7c7970" stroke-width="1.25"><path d="M250 330H296" marker-start="url(#chain-arrow)" marker-end="url(#chain-arrow)"></path><path d="M384 308V226" marker-start="url(#chain-arrow)" marker-end="url(#chain-arrow)"></path><path d="M470 202L518 160" marker-start="url(#chain-arrow)" marker-end="url(#chain-arrow)"></path><path d="M470 202L518 208" marker-start="url(#chain-arrow)" marker-end="url(#chain-arrow)"></path><path d="M470 202L518 256" marker-start="url(#chain-arrow)" marker-end="url(#chain-arrow)"></path></g><text x="273" y="322" text-anchor="middle" font-size="10.5" fill="#a9a69e">LoRa</text><text x="626" y="306" text-anchor="middle" font-size="11" fill="#a9a69e">one server at a time, set by the gateway's mode</text><text x="24" y="386" text-anchor="start" font-size="11.5" fill="#a9a69e">Uplinks climb from the application through the radio and the gateway to one network server;</text><text x="24" y="402" text-anchor="start" font-size="11.5" fill="#a9a69e">ADR commands (LinkADRReq) come back down the same path in RX1 or RX2. The device only executes them.</text></svg>
+<figcaption>LoRaWAN chain on our bench: device layers, gateway, network servers</figcaption></figure>
+<p>Uplinks climb from the device's application through its radio and the gateway to one network server; ADR commands come back down the same path in RX1 or RX2.</p>
+<h3>1. LoRa: the radio (physical layer)</h3>
+<ul>
+<li><strong>LoRa is Semtech's chirp spread-spectrum modulation.</strong> The spreading factor (SF7 to SF12) trades speed for range: each step up roughly doubles time on air and gains about 2.5 dB of sensitivity.</li>
+<li><strong>Each SF can be demodulated below the noise floor.</strong> The required SNR runs from -7.5 dB at SF7 to -20 dB at SF12. ADR algorithms use exactly these numbers.</li>
+<li><strong>In AU915, bandwidth is 125 kHz or 500 kHz.</strong> Wider is faster and less sensitive.</li>
+<li><strong>Data rate (DR) is just a regional index</strong> for a SF/bandwidth pair, so "DR2" means different things in different regions.</li>
+</ul>
+<h3>2. LoRaWAN: the MAC protocol (LoRa Alliance spec TS001)</h3>
+<ul>
+<li><strong>Class A</strong>, which the customer uses: the device transmits whenever it wants, then opens two short receive windows. RX1 opens 1 s after the uplink (configurable) on a frequency tied to the uplink. RX2 opens 1 s later on a fixed frequency and DR. The network can only talk to the device in those windows.</li>
+<li><strong>Frames</strong> carry a frame counter (FCnt), an application port (FPort), optional MAC commands in FOpts (up to 15 bytes), and control bits such as ADR, ADRACKReq and ACK.</li>
+<li><strong>MAC commands</strong> are how the server configures the device: LinkADRReq/Ans (data rate, power, channels, repetitions), TxParamSetupReq (dwell time, max EIRP), RXParamSetupReq, DevStatusReq and others. FPort 0 means the payload is MAC commands only.</li>
+<li><strong>OTAA join</strong>: the device sends a JoinRequest (DevEUI, JoinEUI, DevNonce); the server answers with a JoinAccept giving a DevAddr, RX settings and optionally a channel list or mask (CFList). Session keys are derived from the AppKey.</li>
+<li><strong>Versions that matter here</strong>: L2 1.0.3 vs 1.0.4. Version 1.0.4 adds the 0xF "keep current" values in LinkADRReq, requires DevNonce to never repeat, and refines the ADR back-off.</li>
+</ul>
+<h3>3. Regional parameters: AU915 for Brazil (spec RP002)</h3>
+<ul>
+<li><strong>Brazil uses AU915-928</strong> (RP002-1.0.3). TTN also offers a Brazil-only variant, <code>AU_915_928_FSB_2_BR</code>, with dwell time disabled. LA915 is an Everynet network plan, not a LoRa Alliance region.</li>
+<li><strong>Channels</strong>: 64 uplink channels at 125 kHz (915.2 MHz + 0.2 MHz steps), 8 at 500 kHz, and 8 downlink channels at 500 kHz. An 8-channel gateway like our Conduit listens to one sub-band: sub-band 2 is channels 8-15 (916.8-918.2 MHz) plus 500 kHz channel 65 (917.5 MHz).</li>
+<li><strong>Uplink DRs</strong>: DR0 = SF12/125 kHz down to DR5 = SF7/125 kHz, and DR6 = SF8/500 kHz. Downlink DR8-DR13 are SF12-SF7 at 500 kHz; RX2 defaults to 923.3 MHz at DR8.</li>
+<li><strong>TX power is an index, not dBm</strong>: index n means max EIRP minus 2n dB, so 30 dBm EIRP at index 0 down to 2 dBm at index 14.</li>
+<li><strong>Dwell time</strong>: RP002 says AU915 devices boot with a 400 ms uplink dwell limit. That forbids DR0 and DR1 and limits DR2 to 11 bytes of payload until the server sends TxParamSetupReq.</li>
+<li><strong>Channel masks in AU915 are sent in blocks.</strong> ChMaskCntl 7 switches all 125 kHz channels off and sets the 500 kHz mask; then ChMaskCntl 0-3 set 16 channels at a time (4 sets channels 64-71). Servers send them as one contiguous block of LinkADRReq commands.</li>
+</ul>
+<h3>4. Gateway and packet forwarder</h3>
+<ul>
+<li><strong>The concentrator</strong> (SX1301 on our MTAC-LORA-915 card) demodulates 8 channels at once and timestamps every packet.</li>
+<li><strong>The packet forwarder</strong> (<code>lora_pkt_fwd</code>) relays packets to a server over <strong>Semtech UDP</strong> on port 1700 and transmits the downlinks it is handed. <strong>LoRa Basics Station</strong> is the newer, secured alternative, but it needs mPower 5.3 or later, which our gateway does not have.</li>
+<li><strong>The MultiTech Conduit can also run its own network server</strong>, which is how it runs today.</li>
+</ul>
+<h3>5. Network servers in this story</h3>
+<ul>
+<li><strong>ChirpStack</strong>: open source and self-hosted (v4 is written in Rust), very common in private deployments. ADR is a pluggable algorithm, and its knobs live in per-region config files.</li>
+<li><strong>TTN / The Things Stack (TTS)</strong>: The Things Industries' open-source server. The Things Network is the free community deployment on three clusters (eu1, nam1, au1).</li>
+<li><strong>MultiTech built-in server</strong>: a small network server inside the Conduit's AEP firmware, with its own ADR settings.</li>
+<li><strong>What a server does</strong>: de-duplicates uplinks from several gateways, checks the integrity code (MIC) and frame counters, keeps the session, runs ADR, queues MAC commands, and schedules each downlink to hit RX1 or RX2 on time.</li>
+</ul>
+<h3>6. ST's device stack (STM32CubeWL)</h3>
+<ul>
+<li><strong>Layers, top to bottom</strong>: <code>lora_app.c</code> (application), <code>LmHandler</code> (high-level API plus packages such as the compliance package), <code>LoRaMac</code> (MAC core, <code>LoRaMacAdr.c</code>, <code>Region/RegionAU915.c</code>), <code>SubGHz_Phy</code> (radio driver), <code>radio_board_if</code> (board-specific RF switch and amplifier configuration), and the STM32WL's built-in SX126x-class radio.</li>
+<li><strong>The MAC core is Semtech's LoRaMac-node</strong>, the reference end-device stack, with ST's port around it. ST adds nothing on the ADR path.</li>
+<li><strong>The STM32WL radio has two power amplifiers</strong>: low power (LP, up to 15 dBm) and high power (HP, up to 22 dBm). The board file says which ones are wired to the antenna. Getting this wrong only shows up at some power levels.</li>
+<li><strong>Semtech's newer stack is LoRa Basics Modem (LBM).</strong> ST switched CubeWL to it in v1.5.0 (2026) and removed the LoRaMac-node projects. So a customer on "ST's LoRaMac-node stack" is on CubeWL v1.4.0 or older.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>CubeWL</th>
+<th>ST LoRaWAN MW</th>
+<th>LoRaMac-node</th>
+<th>L2 / RP by default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>v1.0.0 (2020-10)</td>
+<td>2.2.1</td>
+<td>4.4.4</td>
+<td>1.0.3 / RP001-1.0.3</td>
+<td>No 0xF keep values; 1.0.3 back-off</td>
+</tr>
+<tr>
+<td>v1.1.0 (2021-06)</td>
+<td>2.3.0</td>
+<td>4.4.7</td>
+<td>1.0.3 / RP001-1.0.3</td>
+<td>Same as v1.0.0</td>
+</tr>
+<tr>
+<td>v1.2.0 (2022-02)</td>
+<td>2.4.0</td>
+<td>4.5.2</td>
+<td>1.0.4 / RP002-1.0.1</td>
+<td>0xF supported; NVM context added. LSM110A SDK 1.0.4 is based on this MW</td>
+</tr>
+<tr>
+<td>v1.3.0 (2022-11)</td>
+<td>2.5.0</td>
+<td>4.6.0</td>
+<td>1.0.4 / RP002-1.0.1</td>
+<td>Version in the public ST forum report</td>
+</tr>
+<tr>
+<td>v1.3.1 (2024-12)</td>
+<td>2.6.1</td>
+<td>4.7.0</td>
+<td>1.0.4 / RP002-1.0.3</td>
+<td>Radio register access made atomic</td>
+</tr>
+<tr>
+<td>v1.4.0 (2025-10)</td>
+<td>2.6.2</td>
+<td>4.7.0</td>
+<td>1.0.4 / RP002-1.0.3</td>
+<td>Last LoRaMac-node release; our bench</td>
+</tr>
+<tr>
+<td>v1.5.0+ (2026)</td>
+<td>LBM</td>
+<td>LoRa Basics Modem</td>
+<td>n/a</td>
+<td>Legacy stack removed</td>
+</tr>
+</tbody>
+</table>
+<p>The End_Node boot banner prints <code>MW_LORAWAN_VERSION</code>, <code>L2_SPEC_VERSION</code> and <code>RP_SPEC_VERSION</code>, so one boot log from the customer tells us which row they are on.</p>
+<h2>ADR in depth</h2>
+<p>ADR is a contract: the device sets the ADR bit to let the network choose its data rate, TX power and repetitions; the server decides; the device obeys through LinkADRReq. The device keeps one safety net, the ADR back-off, for when it stops hearing the network.</p>
+<h3>How a network server decides</h3>
+<ol>
+<li><strong>Collect SNR</strong> of recent uplinks for the device (usually the best of the last 20).</li>
+<li><strong>Compute the margin</strong>: best SNR minus the SNR the current SF needs, minus an installation margin (ChirpStack 10 dB, TTN 15 dB).</li>
+<li><strong>Turn the margin into steps</strong> (ChirpStack: one step per 3 dB; TTN: 2.5 dB per DR step, the real 2 dB per TX-power step).</li>
+<li><strong>Spend positive steps</strong> first on a faster DR, up to the region's ADR maximum (DR5 in AU915), then on lower TX power.</li>
+<li><strong>Spend negative steps</strong> only on more TX power. Neither ChirpStack nor TTN lowers the DR on a weak link (they only cap DR6 to DR5); recovering range is left to the device's back-off.</li>
+<li><strong>Pick NbTrans</strong> (1-3 copies of each uplink) from the packet loss.</li>
+</ol>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 274" role="img" aria-label="SNR budget of one uplink under ChirpStack and TTN ADR" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><text x="24" y="28" text-anchor="start" font-size="15" fill="#ecebe7" font-weight="600">One uplink at SF7 with SNR +10 dB: what each server may spend</text><text x="24" y="50" text-anchor="start" font-size="11.5" fill="#a9a69e">Each bar is the 17.5 dB between the SF7 decoding limit (-7.5 dB) and the measured SNR (+10 dB).</text><text x="24" y="88" text-anchor="start" font-size="12.5" fill="#ecebe7" font-weight="600">ChirpStack (stock)</text><rect x="190.0" y="66" width="248.4" height="34" rx="4" fill="#2c2b28" stroke="#4a4843" stroke-width="1.25"></rect><text x="314.2" y="87" text-anchor="middle" font-size="11" fill="#a9a69e">installation margin 10 dB</text><rect x="441.4" y="66" width="185.6" height="34" rx="4" fill="#3987e5" fill-opacity="0.22" stroke="#3987e5" stroke-width="1.5"></rect><text x="534.2" y="87" text-anchor="middle" font-size="11" fill="#ecebe7">7.5 dB to spend</text><text x="644" y="81" text-anchor="start" font-size="12" fill="#ecebe7" font-weight="600">-2 TX steps</text><text x="644" y="96" text-anchor="start" font-size="11" fill="#a9a69e">on every uplink</text><text x="24" y="135" text-anchor="start" font-size="12.5" fill="#ecebe7" font-weight="600">TTN</text><text x="24" y="151" text-anchor="start" font-size="11" fill="#a9a69e">first 20 uplinks</text><rect x="190.0" y="120" width="374.1" height="34" rx="4" fill="#2c2b28" stroke="#4a4843" stroke-width="1.25"></rect><text x="377.1" y="141" text-anchor="middle" font-size="11" fill="#a9a69e">installation margin 15 dB</text><rect x="567.1" y="120" width="59.9" height="34" rx="4" fill="#c98500" fill-opacity="0.22" stroke="#c98500" stroke-width="1.5"></rect><text x="597.1" y="141" text-anchor="middle" font-size="11" fill="#ecebe7">2.5</text><text x="644" y="135" text-anchor="start" font-size="12" fill="#ecebe7" font-weight="600">no step yet</text><text x="644" y="150" text-anchor="start" font-size="11" fill="#a9a69e">waits for 20 uplinks</text><text x="24" y="189" text-anchor="start" font-size="12.5" fill="#ecebe7" font-weight="600">TTN</text><text x="24" y="205" text-anchor="start" font-size="11" fill="#a9a69e">after 20 uplinks</text><rect x="190.0" y="174" width="374.1" height="34" rx="4" fill="#2c2b28" stroke="#4a4843" stroke-width="1.25"></rect><text x="377.1" y="195" text-anchor="middle" font-size="11" fill="#a9a69e">installation margin 15 dB</text><rect x="567.1" y="174" width="59.9" height="34" rx="4" fill="#3987e5" fill-opacity="0.22" stroke="#3987e5" stroke-width="1.5"></rect><text x="597.1" y="195" text-anchor="middle" font-size="11" fill="#ecebe7">2.5</text><text x="644" y="189" text-anchor="start" font-size="12" fill="#ecebe7" font-weight="600">-1 TX step</text><text x="644" y="204" text-anchor="start" font-size="11" fill="#a9a69e">one real 2 dB step</text><rect x="24" y="226" width="12" height="12" rx="2" fill="#2c2b28" stroke="#4a4843"></rect><text x="42" y="236" text-anchor="start" font-size="11.5" fill="#a9a69e">safety margin</text><rect x="150" y="226" width="12" height="12" rx="2" fill="#c98500" fill-opacity="0.22" stroke="#c98500"></rect><text x="168" y="236" text-anchor="start" font-size="11.5" fill="#a9a69e">TTN penalty until 20 uplinks</text><rect x="360" y="226" width="12" height="12" rx="2" fill="#3987e5" fill-opacity="0.22" stroke="#3987e5"></rect><text x="378" y="236" text-anchor="start" font-size="11.5" fill="#a9a69e">margin the server spends on ADR</text><text x="24" y="262" text-anchor="start" font-size="11.5" fill="#a9a69e">ChirpStack turns each 3 dB of spare margin into one step and acts on a single uplink; TTN steps by the real 2 dB.</text></svg>
+<figcaption>Same uplink, two ADR algorithms: where the SNR margin goes</figcaption></figure>
+<h3>Anatomy of LinkADRReq and LinkADRAns</h3>
+<p>One LinkADRReq is 4 bytes after its command ID 0x03. Our trace shows <code>03 20 02 00 71</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Byte(s)</th>
+<th>Field</th>
+<th>Value in the example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>20</code></td>
+<td>DataRate (high nibble), TXPower (low nibble)</td>
+<td>DR2, TX index 0</td>
+</tr>
+<tr>
+<td><code>02 00</code></td>
+<td>ChMask, 16 bits little-endian</td>
+<td>0x0002</td>
+</tr>
+<tr>
+<td><code>71</code></td>
+<td>ChMaskCntl (bits 6-4), NbTrans (bits 3-0)</td>
+<td>ChMaskCntl 7, NbTrans 1</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>The answer, LinkADRAns, is one status byte</strong>: bit 2 power OK, bit 1 data rate OK, bit 0 channel mask OK. 0x07 means all accepted.</li>
+<li><strong>In L2 1.0.4 the block is all or nothing.</strong> If any bit is a NACK, the device applies none of it: no DR, power or mask change.</li>
+<li><strong>DR or TXPower = 0xF means "keep current"</strong> (1.0.4 only). An L2 1.0.3 device rejects it.</li>
+<li>With ADR on, <strong>ST applies DR, power and NbTrans from the last command of the block</strong>, and answers each command with the same status.</li>
+</ul>
+<h3>The device's back-off (L2 1.0.4, as in ST's stack)</h3>
+<p>The device counts uplinks since its last downlink (ADR_ACK_CNT). With ADR_ACK_LIMIT = 64 and ADR_ACK_DELAY = 32:</p>
+<ol>
+<li><strong>At 64 uplinks without a downlink</strong> it sets the ADRACKReq bit, asking the server for any reply. At our 15 s period that is 16 minutes.</li>
+<li><strong>At 96</strong> it resets TX power to the maximum (index 0).</li>
+<li><strong>At 128, and every 32 after</strong>, it steps the DR down by one.</li>
+<li><strong>At the lowest DR</strong> it restores the default channel mask and NbTrans = 1. In a stock AU915 build (HYBRID off) the default mask is all 72 channels (our bench build restores sub-band 2 instead), so on an 8-channel gateway about 7 of 8 uplinks then go unheard until the server re-sends the mask.</li>
+</ol>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 226" role="img" aria-label="Device ADR back-off timeline at a 15 second uplink period" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><text x="24" y="28" text-anchor="start" font-size="15" fill="#ecebe7" font-weight="600">Device back-off at our 15 s uplink period (ADR_ACK_LIMIT 64, ADR_ACK_DELAY 32)</text><rect x="40" y="78" width="226" height="18" rx="4" fill="#2c2b28" stroke="#4a4843" stroke-width="1.25"></rect><text x="153" y="91" text-anchor="middle" font-size="11" fill="#a9a69e">normal: as the server commands</text><rect x="270" y="78" width="454" height="18" rx="4" fill="#c98500" fill-opacity="0.10" stroke="#c98500" stroke-width="1.25"></rect><path d="M268 78l9 9l-9 9l-9 -9z" fill="#3987e5"></path><path d="M382 78l9 9l-9 9l-9 -9z" fill="#3987e5"></path><path d="M496 78l9 9l-9 9l-9 -9z" fill="#3987e5"></path><path d="M610 78l9 9l-9 9l-9 -9z" fill="#3987e5"></path><text x="268.0" y="66" text-anchor="middle" font-size="11.5" fill="#ecebe7" font-weight="600">ADRACKReq bit set</text><text x="496.0" y="66" text-anchor="middle" font-size="11.5" fill="#ecebe7" font-weight="600">DR down one (DR3 to DR2)</text><text x="40.0" y="118" text-anchor="middle" font-size="10.5" fill="#a9a69e">0</text><text x="268.0" y="118" text-anchor="middle" font-size="10.5" fill="#a9a69e">64 (16 min)</text><text x="382.0" y="118" text-anchor="middle" font-size="10.5" fill="#a9a69e">96 (24 min)</text><text x="496.0" y="118" text-anchor="middle" font-size="10.5" fill="#a9a69e">128 (32 min)</text><text x="610.0" y="118" text-anchor="middle" font-size="10.5" fill="#a9a69e">160 (40 min)</text><text x="724" y="136" text-anchor="end" font-size="10.5" fill="#a9a69e">uplinks since the last downlink</text><text x="382.0" y="154" text-anchor="middle" font-size="11.5" fill="#ecebe7" font-weight="600">TX power back to max (index 0)</text><text x="610.0" y="154" text-anchor="middle" font-size="11.5" fill="#ecebe7" font-weight="600">at DR2: default mask, NbTrans 1</text><text x="24" y="182" text-anchor="start" font-size="11.5" fill="#a9a69e">Any downlink resets the count to 0. Our board sits at DR3 and, with dwell time on, cannot go below DR2.</text><text x="24" y="198" text-anchor="start" font-size="11.5" fill="#a9a69e">Stock AU915 builds then re-enable all 72 channels: on an 8-channel gateway about 7 of 8 uplinks go unheard.</text><text x="24" y="214" text-anchor="start" font-size="11.5" fill="#a9a69e">Our bench build restores sub-band 2 instead, so it keeps reaching the gateway.</text></svg>
+<figcaption>ADR back-off of ST's stack (L2 1.0.4) for our board, from LoRaMacAdr.c</figcaption></figure>
+<h3>What is special about AU915 on the STM32WL</h3>
+<ul>
+<li><strong>Dwell time on at boot.</strong> ST's stack starts with uplink dwell time = 1, so its lowest uplink DR is DR2 and DR2 carries at most 11 bytes of payload. Stock ChirpStack never sends TxParamSetupReq, so it does not change this. TTN's FSB_2 plan matches it; TTN's FSB_2_BR plan turns it off.</li>
+<li><strong>TX power index to dBm</strong>: the stack asks the radio for floor(30 - 2 x index - 2.15) dBm conducted, using a 2.15 dBi assumed antenna gain.</li>
+<li><strong>The two amplifiers split the range.</strong> Requests above 15 dBm use the HP amplifier, capped at 22 dBm; 15 dBm and below use the LP amplifier. On the Nucleo, indices 0-2 (27, 25, 23 dBm requested) all come out at 22 dBm, and index 6 (15 dBm) is the first LP index.</li>
+<li><strong>The board file decides which amplifier exists.</strong> ST's Nucleo template declares both (<code>RBI_CONF_RFO_LP_HP</code>). SJIT's LSM110A code declares HP only (<code>RBI_CONF_RFO_HP</code>). A product built from the Nucleo template on an HP-only module would send indices 6-14 into an amplifier that is not connected to the antenna.</li>
+</ul>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 446" role="img" aria-label="TX power index against actual radio output on the NUCLEO-WL55JC" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><text x="24" y="28" text-anchor="start" font-size="15" fill="#ecebe7" font-weight="600">TX power index vs actual radio output on the NUCLEO-WL55JC (AU915)</text><text x="197.7" y="52" text-anchor="middle" font-size="11.5" fill="#a9a69e">high-power amplifier</text><text x="522.7" y="52" text-anchor="middle" font-size="11.5" fill="#a9a69e">low-power amplifier (index 6 and up)</text><text x="60" y="52" text-anchor="end" font-size="10.5" fill="#a9a69e">dBm</text><line x1="70" x2="720" y1="274.7" y2="274.7" stroke="#2c2b28" stroke-width="1"></line><text x="60" y="278.7" text-anchor="end" font-size="10.5" fill="#a9a69e">0</text><line x1="70" x2="720" y1="198.0" y2="198.0" stroke="#2c2b28" stroke-width="1"></line><text x="60" y="202.0" text-anchor="end" font-size="10.5" fill="#a9a69e">10</text><line x1="70" x2="720" y1="121.3" y2="121.3" stroke="#2c2b28" stroke-width="1"></line><text x="60" y="125.3" text-anchor="end" font-size="10.5" fill="#a9a69e">20</text><line x1="70" x2="720" y1="290" y2="290" stroke="#4a4843" stroke-width="1"></line><line x1="325.4" x2="325.4" y1="58" y2="290" stroke="#4a4843" stroke-width="1"></line><text x="540" y="86" text-anchor="middle" font-size="11.5" fill="#a9a69e">If the module wires HP only (the suspect),</text><text x="540" y="102" text-anchor="middle" font-size="11.5" fill="#a9a69e">these indices never reach the antenna.</text><polyline points="70.0,67.7 116.4,83.0 162.9,98.3 209.3,113.7 255.7,129.0 302.1,144.3 348.6,159.7 395.0,175.0 441.4,190.3 487.9,205.7 534.3,221.0 580.7,236.3 627.1,251.7 673.6,267.0 720.0,282.3" fill="none" stroke="#c98500" stroke-width="2" stroke-linejoin="round"></polyline><polyline points="70.0,106.0 116.4,106.0 162.9,106.0 209.3,113.7 255.7,129.0 302.1,144.3 348.6,159.7 395.0,175.0 441.4,190.3 487.9,205.7 534.3,221.0 580.7,236.3 627.1,251.7 673.6,267.0 720.0,282.3" fill="none" stroke="#3987e5" stroke-width="2" stroke-linejoin="round"></polyline><circle cx="70.0" cy="67.7" r="4" fill="#c98500" stroke="#1f1e1c" stroke-width="2"><title>Index 0: EIRP 30 dBm, requested 27 dBm, actual 22 dBm (HP, clamped)</title></circle><circle cx="70.0" cy="106.0" r="4" fill="#3987e5" stroke="#1f1e1c" stroke-width="2"><title>Index 0: EIRP 30 dBm, requested 27 dBm, actual 22 dBm (HP, clamped)</title></circle><text x="70.0" y="306" text-anchor="middle" font-size="11" fill="#a9a69e">0</text><circle cx="116.4" cy="83.0" r="4" fill="#c98500" stroke="#1f1e1c" stroke-width="2"><title>Index 1: EIRP 28 dBm, requested 25 dBm, actual 22 dBm (HP, clamped)</title></circle><circle cx="116.4" cy="106.0" r="4" fill="#3987e5" stroke="#1f1e1c" stroke-width="2"><title>Index 1: EIRP 28 dBm, requested 25 dBm, actual 22 dBm (HP, clamped)</title></circle><text x="116.4" y="306" text-anchor="middle" font-size="11" fill="#a9a69e">1</text><circle cx="162.9" cy="98.3" r="4" fill="#c98500" stroke="#1f1e1c" stroke-width="2"><title>Index 2: EIRP 26 dBm, requested 23 dBm, actual 22 dBm (HP, clamped)</title></circle><circle cx="162.9" cy="106.0" r="4" fill="#3987e5" stroke="#1f1e1c" stroke-width="2"><title>Index 2: EIRP 26 dBm, requested 23 dBm, actual 22 dBm (HP, clamped)</title></circle><text x="162.9" y="306" text-anchor="middle" font-size="11" fill="#a9a69e">2</text><circle cx="209.3" cy="113.7" r="4" fill="#3987e5" stroke="#1f1e1c" stroke-width="2"><title>Index 3: EIRP 24 dBm, requested 21 dBm, actual 21 dBm (HP)</title></circle><text x="209.3" y="306" text-anchor="middle" font-size="11" fill="#a9a69e">3</text><circle cx="255.7" cy="129.0" r="4" fill="#3987e5" stroke="#1f1e1c" stroke-width="2"><title>Index 4: EIRP 22 dBm, requested 19 dBm, actual 19 dBm (HP)</title></circle><text x="255.7" y="306" text-anchor="middle" font-size="11" fill="#a9a69e">4</text><circle cx="302.1" cy="144.3" r="4" fill="#3987e5" stroke="#1f1e1c" stroke-width="2"><title>Index 5: EIRP 20 dBm, requested 17 dBm, actual 17 dBm (HP)</title></circle><text x="302.1" y="306" text-anchor="middle" font-size="11" fill="#a9a69e">5</text><circle cx="348.6" cy="159.7" r="4" fill="#3987e5" stroke="#1f1e1c" stroke-width="2"><title>Index 6: EIRP 18 dBm, requested 15 dBm, actual 15 dBm (LP)</title></circle><text x="348.6" y="306" text-anchor="middle" font-size="11" fill="#a9a69e">6</text><circle cx="395.0" cy="175.0" r="4" fill="#3987e5" stroke="#1f1e1c" stroke-width="2"><title>Index 7: EIRP 16 dBm, requested 13 dBm, actual 13 dBm (LP)</title></circle><text x="395.0" y="306" text-anchor="middle" font-size="11" fill="#a9a69e">7</text><circle cx="441.4" cy="190.3" r="4" fill="#3987e5" stroke="#1f1e1c" stroke-width="2"><title>Index 8: EIRP 14 dBm, requested 11 dBm, actual 11 dBm (LP)</title></circle><text x="441.4" y="306" text-anchor="middle" font-size="11" fill="#a9a69e">8</text><circle cx="487.9" cy="205.7" r="4" fill="#3987e5" stroke="#1f1e1c" stroke-width="2"><title>Index 9: EIRP 12 dBm, requested 9 dBm, actual 9 dBm (LP)</title></circle><text x="487.9" y="306" text-anchor="middle" font-size="11" fill="#a9a69e">9</text><circle cx="534.3" cy="221.0" r="4" fill="#3987e5" stroke="#1f1e1c" stroke-width="2"><title>Index 10: EIRP 10 dBm, requested 7 dBm, actual 7 dBm (LP)</title></circle><text x="534.3" y="306" text-anchor="middle" font-size="11" fill="#a9a69e">10</text><circle cx="580.7" cy="236.3" r="4" fill="#3987e5" stroke="#1f1e1c" stroke-width="2"><title>Index 11: EIRP 8 dBm, requested 5 dBm, actual 5 dBm (LP)</title></circle><text x="580.7" y="306" text-anchor="middle" font-size="11" fill="#a9a69e">11</text><circle cx="627.1" cy="251.7" r="4" fill="#3987e5" stroke="#1f1e1c" stroke-width="2"><title>Index 12: EIRP 6 dBm, requested 3 dBm, actual 3 dBm (LP)</title></circle><text x="627.1" y="306" text-anchor="middle" font-size="11" fill="#a9a69e">12</text><circle cx="673.6" cy="267.0" r="4" fill="#3987e5" stroke="#1f1e1c" stroke-width="2"><title>Index 13: EIRP 4 dBm, requested 1 dBm, actual 1 dBm (LP)</title></circle><text x="673.6" y="306" text-anchor="middle" font-size="11" fill="#a9a69e">13</text><circle cx="720.0" cy="282.3" r="4" fill="#3987e5" stroke="#1f1e1c" stroke-width="2"><title>Index 14: EIRP 2 dBm, requested -1 dBm, actual -1 dBm (LP)</title></circle><text x="720.0" y="306" text-anchor="middle" font-size="11" fill="#a9a69e">14</text><text x="176" y="84" text-anchor="start" font-size="11" fill="#ecebe7">requested: 27, 25, 23</text><text x="80" y="140" text-anchor="start" font-size="11" fill="#ecebe7">actual: held at 22</text><text x="395" y="324" text-anchor="middle" font-size="11.5" fill="#a9a69e">TX power index (set by LinkADRReq)</text><text x="70" y="346" text-anchor="start" font-size="11.5" fill="#a9a69e">ChirpStack, stock ADR at good SNR: all the way to 14, 2 steps per uplink</text><rect x="70" y="352" width="650.0" height="6" rx="3" fill="#7c7970"></rect><text x="70" y="374" text-anchor="start" font-size="11.5" fill="#a9a69e">TTN at good SNR: about 0 to 4, one step per ~20 uplinks</text><rect x="70" y="380" width="185.7" height="6" rx="3" fill="#7c7970"></rect><text x="70" y="402" text-anchor="start" font-size="11.5" fill="#a9a69e">MultiTech built-in on our bench: had reached 10 by Oct 27</text><rect x="70" y="408" width="464.3" height="6" rx="3" fill="#7c7970"></rect><line x1="70" x2="90" y1="430" y2="430" stroke="#c98500" stroke-width="2"></line><text x="96" y="434" text-anchor="start" font-size="11.5" fill="#a9a69e">requested at the chip</text><line x1="300" x2="320" y1="430" y2="430" stroke="#3987e5" stroke-width="2"></line><text x="326" y="434" text-anchor="start" font-size="11.5" fill="#a9a69e">actual radio output</text></svg>
+<figcaption>TX power index vs actual output, computed from CubeWL v1.4.0 RegionCommon.c and radio_driver.c (hover a point for values)</figcaption></figure>
+<table>
+<thead><tr><th>TX index</th><th>EIRP (dBm)</th><th>Requested at the chip (dBm)</th><th>Actual output (dBm)</th><th>Amplifier</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>30</td><td>27</td><td>22</td><td>HP, clamped</td></tr>
+<tr><td>1</td><td>28</td><td>25</td><td>22</td><td>HP, clamped</td></tr>
+<tr><td>2</td><td>26</td><td>23</td><td>22</td><td>HP, clamped</td></tr>
+<tr><td>3</td><td>24</td><td>21</td><td>21</td><td>HP</td></tr>
+<tr><td>4</td><td>22</td><td>19</td><td>19</td><td>HP</td></tr>
+<tr><td>5</td><td>20</td><td>17</td><td>17</td><td>HP</td></tr>
+<tr><td>6</td><td>18</td><td>15</td><td>15</td><td>LP</td></tr>
+<tr><td>7</td><td>16</td><td>13</td><td>13</td><td>LP</td></tr>
+<tr><td>8</td><td>14</td><td>11</td><td>11</td><td>LP</td></tr>
+<tr><td>9</td><td>12</td><td>9</td><td>9</td><td>LP</td></tr>
+<tr><td>10</td><td>10</td><td>7</td><td>7</td><td>LP</td></tr>
+<tr><td>11</td><td>8</td><td>5</td><td>5</td><td>LP</td></tr>
+<tr><td>12</td><td>6</td><td>3</td><td>3</td><td>LP</td></tr>
+<tr><td>13</td><td>4</td><td>1</td><td>1</td><td>LP</td></tr>
+<tr><td>14</td><td>2</td><td>-1</td><td>-1</td><td>LP</td></tr>
+</tbody></table>
+<p>On TTN the device stays at or near full power on the HP amplifier, stepping down about once per 20 uplinks. Stock ChirpStack walks it across the amplifier switch and down to about -1 dBm, territory TTN reaches only if SNR stays above about 9.5 dB, and then only one step per \~20 uplinks.</p>
+<h2>ChirpStack vs TTN: ADR and MAC defaults for AU915</h2>
+<p>With stock settings ChirpStack moves faster, goes lower and recovers worse than TTN. Values are from ChirpStack v4.20.0 (<code>region_au915_1</code>) and The Things Stack v3.36-3.37 source.</p>
+<table>
+<thead>
+<tr>
+<th>Behaviour</th>
+<th>ChirpStack v4.20 (stock)</th>
+<th>TTN / The Things Stack</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ADR safety margin</td>
+<td>10 dB (<code>installation_margin</code>, per region)</td>
+<td>15 dB, plus 2.5 dB more until 20 uplinks</td>
+</tr>
+<tr>
+<td>dB per step</td>
+<td>3 dB per DR or TX step (an AU915 TX step is really 2 dB)</td>
+<td>2.5 dB per DR; real 2 dB per TX step</td>
+</tr>
+<tr>
+<td>History needed before acting</td>
+<td>None for upward steps; cleared after every change</td>
+<td>Uplinks since the last change; penalty below 20</td>
+</tr>
+<tr>
+<td>Order of changes</td>
+<td>DR up to DR5, then TX power down, in one command</td>
+<td>DR up (TX reset to index 0), leftover margin lowers TX</td>
+</tr>
+<tr>
+<td>Example: SF7 at +10 dB SNR</td>
+<td>+2 TX indices every uplink, until index 14</td>
+<td>+1 index per \~20 uplinks, only while SNR stays above 9.5 dB</td>
+</tr>
+<tr>
+<td>Raises TX power again</td>
+<td>Only after 20 uplinks at the same index and margin of -3 dB or worse</td>
+<td>On negative margin; a 1-index raise waits for 20 uplinks</td>
+</tr>
+<tr>
+<td>NbTrans</td>
+<td>1-3 from loss over 20 uplinks; drops back right after a raise</td>
+<td>Needs 10+ uplinks; otherwise kept</td>
+</tr>
+<tr>
+<td>After a rejected LinkADRReq</td>
+<td>Error count; after the 2nd, no LinkADRReq for the rest of the session</td>
+<td>Blacklists only the rejected DR or TX index</td>
+</tr>
+<tr>
+<td>0xF "keep current"</td>
+<td>Never sent</td>
+<td>Sent to MAC 1.0.4 devices for unchanged DR/TX</td>
+</tr>
+<tr>
+<td>On ADRACKReq</td>
+<td>Forced downlink plus a channel-reset block carrying its stored DR and TX index</td>
+<td>Forced downlink; LinkADRReq only if needed</td>
+</tr>
+<tr>
+<td>TxParamSetupReq (dwell time)</td>
+<td>Never with stock config; assumes dwell off</td>
+<td>Sent after join per frequency plan</td>
+</tr>
+<tr>
+<td><code>uplink_max_eirp</code> trap</td>
+<td>Default 0 means EIRP index 0 = 8 dBm if dwell signalling is enabled</td>
+<td>Not applicable (30 dBm)</td>
+</tr>
+<tr>
+<td>RX1 delay</td>
+<td>1 s</td>
+<td>5 s</td>
+</tr>
+<tr>
+<td>Channel mask after join</td>
+<td>CFList when the profile is MAC 1.0.3+; otherwise a LinkADRReq block</td>
+<td>CFList for RP002 bands</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The Conduit's built-in MultiTech server</strong> is a third behaviour. From its config: ADR capped at DR3, step setting 30, RX1 delay 1 s, RX2 at DR12 (SF8/500), uplink dwell 0. On join it sent a ChMaskCntl 7 + 0 block rather than a CFList. We have not inspected its algorithm.</p>
+<p><strong>Server-side levers on ChirpStack</strong>: raise <code>installation_margin</code> (15-17.5 dB keeps it near TTN), set <code>uplink_dwell_time_400ms</code> together with <code>uplink_max_eirp = 30</code>, raise <code>rx1_delay</code> to 3-5 s, raise <code>max_mac_command_error_count</code>, or write a JavaScript ADR plugin that caps the TX index. All but the plugin and max_mac_command_error_count (server-wide, under [network] in chirpstack.toml) are region-wide settings.</p>
+<h2>Root-cause hypotheses, ranked</h2>
+<p>Hypothesis 1 is the largest deterministic ADR difference between the two servers with stock settings; 2-4 are what could turn it into a device failure. A skeptical reviewer checked every claim against the ChirpStack, The Things Stack and CubeWL source. "Supported in code" means the mechanism is confirmed there, not yet reproduced on the bench.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Hypothesis</th>
+<th>Side</th>
+<th>Code verdict</th>
+<th>Bench test</th>
+<th>Bench result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>At good SNR ChirpStack lowers TX power 2 indices per uplink, down to 14; TTN steps about once per 20 uplinks</td>
+<td>Server</td>
+<td>Supported in code</td>
+<td>30 uplinks on each server, logging TX index per uplink; then <code>installation_margin = 17.5</code> should stop the ramp</td>
+<td>Not run</td>
+</tr>
+<tr>
+<td>2</td>
+<td>The LP amplifier is not wired or configured on the customer's board, so uplinks at index 6 and above are lost</td>
+<td>Device</td>
+<td>Plausible</td>
+<td>ADR off, sweep TX index 0-14 and compare gateway RSSI per index; repeat with the customer's <code>radio_board_if</code> files</td>
+<td>Not run</td>
+</tr>
+<tr>
+<td>3</td>
+<td>The device hangs after its first LP transmission (pattern of the ST forum report)</td>
+<td>Device</td>
+<td>Plausible</td>
+<td>CubeWL v1.3.0 and v1.4.0 builds, 100+ uplinks with current logging; also ADR off with TX index 7 forced</td>
+<td>Not run</td>
+</tr>
+<tr>
+<td>4</td>
+<td>After the device's back-off, ChirpStack re-imposes its stale low-power TX index (e.g. 14)</td>
+<td>Both</td>
+<td>Supported in code</td>
+<td>Test build with ADR_ACK_LIMIT 8 / DELAY 4, block downlinks, check that the first downlink after ADRACKReq carries TX index 14</td>
+<td>Not run</td>
+</tr>
+<tr>
+<td>5</td>
+<td>ChirpStack flip-flops NbTrans: up after loss, back to 1 within one or two uplinks</td>
+<td>Server</td>
+<td>Supported in code</td>
+<td>Induce about 20% uplink loss; watch NbTrans go 1, 2-3, 1</td>
+<td>Not run</td>
+</tr>
+<tr>
+<td>6</td>
+<td>Channel mask diverges when device ADR is off and the join has no CFList</td>
+<td>Both</td>
+<td>Supported in code</td>
+<td>Profile MAC 1.0.2, device ADR off, fresh join; expect LinkADRAns 0x04 then 0x07 with channels 8-71 (64) left on (HYBRID-off build)</td>
+<td>Not run</td>
+</tr>
+<tr>
+<td>7</td>
+<td>ChirpStack stops sending LinkADRReq after 2 rejections</td>
+<td>Server</td>
+<td>Plausible</td>
+<td>Watch for "not acknowledged" in ChirpStack logs; retry with <code>max_mac_command_error_count = 5</code></td>
+<td>Not run</td>
+</tr>
+<tr>
+<td>8</td>
+<td>Dwell-time asymmetry: payload dropped at DR2, or the 8 dBm <code>uplink_max_eirp</code> trap</td>
+<td>Both</td>
+<td>Plausible</td>
+<td>Check the customer's TTN frequency plan; send 10 bytes at DR2 while a MAC block is pending</td>
+<td>Not run</td>
+</tr>
+<tr>
+<td>9</td>
+<td>ChirpStack's 1 s RX1 delay is too tight for the setup (TTN uses 5 s)</td>
+<td>Config</td>
+<td>Plausible</td>
+<td>Count RX1/RX2 misses vs scheduled downlinks and TOO_LATE gateway acks; retry with <code>rx1_delay = 3</code></td>
+<td>Not run</td>
+</tr>
+<tr>
+<td>10</td>
+<td>LoRaWAN or RP version mismatch between ChirpStack profile, TTN registration and the build</td>
+<td>Config</td>
+<td>Plausible</td>
+<td>Get the customer's boot banner and profile settings; rerun test 1 with profile MAC 1.0.2</td>
+<td>Not run</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Back-off at the lowest DR re-enables all 72 channels</td>
+<td>Device</td>
+<td>Plausible</td>
+<td>Test build with HYBRID_ENABLED 0; block downlinks until the mask resets; count uplinks until ChirpStack re-sends the mask</td>
+<td>Not run</td>
+</tr>
+<tr>
+<td>12</td>
+<td>Saved NVM context carries ChirpStack state into TTN tests</td>
+<td>Device</td>
+<td>Supported in code</td>
+<td>Erase the NVM page at 0x0803F000 before every server A/B run</td>
+<td>Not run</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Refuted by the reviewer</strong>: "ChirpStack commands DR0/DR1 and the dwell-limited device rejects it in a loop" only applies to ChirpStack v3; v4 only raises the DR or caps it at DR5, never commanding DR0/DR1. "TTN leaves DR6 alone" is also wrong; both servers cap AU915 ADR at DR5.</p>
+<h2>Questions for the customer</h2>
+<p>The first four answers decide which hypotheses survive; ask for logs, not descriptions.</p>
+<ul>
+<li><strong>What exactly goes wrong on ChirpStack?</strong> The device stops transmitting, uplinks are lost, the battery drains, it rejoins, or DR/power oscillate? After how many uplinks, and does it recover?</li>
+<li><strong>A device boot log</strong>: the banner lines <code>MW_LORAWAN_VERSION</code>, <code>L2_SPEC_VERSION</code> and <code>RP_SPEC_VERSION</code> identify their CubeWL release.</li>
+<li><strong>Their <code>radio_board_if.c</code> / <code>.h</code></strong>: the <code>RBI_CONF_RFO</code> setting, the RF-switch truth table and the max powers. Did they port it from the Nucleo template or from SJIT's code?</li>
+<li><strong>ChirpStack details</strong>: v3 or v4 (which version), ADR algorithm, <code>installation_margin</code>, <code>min_dr</code>/<code>max_dr</code>, dwell-time and <code>uplink_max_eirp</code> settings, <code>rx1_delay</code>, and the device profile's MAC version and regional-parameters revision.</li>
+<li><strong>ChirpStack evidence for a failure window</strong>: the device's LoRaWAN frames (LinkADRReq/Ans), and server logs containing "not acknowledged".</li>
+<li><strong>TTN details</strong>: cluster, frequency plan (<code>AU_915_928_FSB_2</code> or <code>AU_915_928_FSB_2_BR</code>), and the MAC/PHY versions the device is registered with.</li>
+<li><strong>Test conditions on each server</strong>: same gateway? 8 or 16 channels? Bench or field, and typical RSSI/SNR? Very strong bench signal makes ChirpStack drive power to the minimum.</li>
+<li><strong>Application behaviour</strong>: ADR always on? Does the app set DR or TX power itself? Uplink period, payload size, confirmed or unconfirmed?</li>
+<li><strong>Persistence</strong>: OTAA or ABP? If OTAA, is DevNonce stored in flash? Is the NVM context enabled, and do they rejoin at boot?</li>
+<li><strong>Firmware on the module</strong>: their own CubeWL application, or SJIT's AT-command firmware?</li>
+<li><strong>What they tried</strong>: ADR off on ChirpStack? A higher installation margin? Did either fix it?</li>
+<li><strong>Certification plan</strong>: regions, test house, LCTT version and timeline; any pre-scan results so far.</li>
+</ul>
+<h2>Certification notes</h2>
+<p>The ADR code should behave in LoRa Alliance tests exactly like Semtech's reference stack. But the newest stack versions the customer can be on (CubeWL v1.3.x and v1.4.0) have no public AU915 certification evidence, and certification does not test the RF problem we suspect.</p>
+<ul>
+<li><strong>Public evidence for ST's own reference designs is outside AU915.</strong> We found a NUCLEO-WL55JC1 on CubeWL v1.0.0 certified for EU868, and an STM32WL5M on CubeWL v1.3.0 (L2 1.0.4) for KR920 and IN865. No AU915 or US915 report for an ST reference design turned up.</li>
+<li><strong>Semtech's own pre-certification</strong> passed AU915 with LoRaMac-node 4.5.0 and 4.5.1; 4.5.2 (CubeWL v1.2.0) left AU915 Class A untested. For 4.6.0 and 4.7.0, which CubeWL v1.3.x and v1.4.0 use, AU915 is listed as "Not tested". An AU915 LCTT pre-scan is worth recommending.</li>
+<li><strong>The LSM110A itself is LoRaWAN-certified for AU915</strong> (DEKRA, L2 1.0.4) with SJIT's firmware, which is built on ST's LoRaWAN middleware 2.4.0 (CubeWL v1.2.0). If the customer runs its own CubeWL application on the module, expect to certify the end product. This is our inference; confirm it with the LoRa Alliance or a test house.</li>
+<li><strong>The test tool (LCTT) does not measure radiated power per TX index.</strong> A wrong amplifier configuration (hypothesis 2) would pass certification and still fail in the field, so it needs its own RF test.</li>
+<li><strong>Keep the certified image stock.</strong> It must keep the compliance package (<code>LmhpCompliance</code>, port 224) and the region defaults: 72-channel mask, dwell time on, full back-off, TX indices 0-14. Our lab firmware's sub-band-2 default mask must not go into it. Prefer server-side fixes; a device workaround belongs in a separate build.</li>
+<li>With OTAA, <strong>DevNonce must survive resets.</strong> TS001-1.0.4 forbids reuse, and the stock End_Node only saves it when a button is pressed.</li>
+<li><strong>One possible conformance gap to check before testing.</strong> With ADR off, ST's stack evaluates each LinkADRReq in a block on its own rather than as one unit; compare this with TS001-1.0.4 sections 5.2 and 4.3.1.1.</li>
+<li><strong>ANATEL (Brazilian regulator) is separate from LoRaWAN certification.</strong> The LSM110A has ANATEL certificate 05243-24-12325. Secondary sources say Ato 14158 ends an exemption 125 kHz LoRa relied on (the 6 dB bandwidth rule) for new filings from 6 Oct 2026; confirm with a Brazilian certification body.</li>
+</ul>
+<h2>Glossary</h2>
+<p>Alphabetical; terms specific to this case are explained in its context.</p>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ABP</td>
+<td>Activation By Personalisation: session keys and DevAddr are pre-loaded, with no join. The alternative to OTAA.</td>
+</tr>
+<tr>
+<td>ADR</td>
+<td>Adaptive Data Rate: the network server tunes each device's data rate, TX power and repetitions from link quality. ("ANR" in our notes means ADR.)</td>
+</tr>
+<tr>
+<td>ADR_ACK_CNT / LIMIT / DELAY</td>
+<td>Device counter of uplinks since the last downlink, and the thresholds (64, 32 in ST's stack) that trigger ADRACKReq and the back-off.</td>
+</tr>
+<tr>
+<td>ADRACKReq</td>
+<td>Uplink bit meaning "I have not heard from you; please answer". Set by the device during back-off.</td>
+</tr>
+<tr>
+<td>AEP / mPower / mLinux</td>
+<td>MultiTech Conduit firmware families. Ours is AEP 1.7.4 on mLinux 4.1.9; mPower is the newer line (5.x and later).</td>
+</tr>
+<tr>
+<td>AppKey</td>
+<td>Root key for a LoRaWAN 1.0.x device, used to derive session keys at join. ChirpStack v4 stores it in the "nwkKey" field.</td>
+</tr>
+<tr>
+<td>AU915</td>
+<td>Regional plan for 915-928 MHz, used by Brazil and Australia. Sub-band 2 = channels 8-15 plus 65.</td>
+</tr>
+<tr>
+<td>Basic Station</td>
+<td>Semtech's newer, secured gateway-to-server protocol (WebSocket/TLS). Not available on our AEP gateway.</td>
+</tr>
+<tr>
+<td>BW</td>
+<td>Bandwidth of a LoRa channel: 125 kHz or 500 kHz in AU915.</td>
+</tr>
+<tr>
+<td>CFList</td>
+<td>Optional list in the JoinAccept; in AU915 it carries the channel mask, so no LinkADRReq block is needed after join.</td>
+</tr>
+<tr>
+<td>ChirpStack</td>
+<td>Open-source LoRaWAN network server ("Chirp" in our notes); v4 is current.</td>
+</tr>
+<tr>
+<td>ChMask / ChMaskCntl</td>
+<td>Channel-enable bitmap in LinkADRReq, and the selector saying which 16 channels it applies to (7 = all 125 kHz off, set the 500 kHz mask).</td>
+</tr>
+<tr>
+<td>Class A / B / C</td>
+<td>Device receive modes: A listens only after its own uplinks (the customer's device); B adds scheduled slots; C listens continuously.</td>
+</tr>
+<tr>
+<td>Concentrator</td>
+<td>Multi-channel gateway radio (SX1301 on our card) that demodulates eight 125 kHz channels plus one 500 kHz channel at once.</td>
+</tr>
+<tr>
+<td>CubeWL</td>
+<td>STM32CubeWL, ST's software package for STM32WL: HAL, examples, and the LoRaWAN middleware.</td>
+</tr>
+<tr>
+<td>DevAddr</td>
+<td>32-bit network address assigned to the device at join.</td>
+</tr>
+<tr>
+<td>DevEUI</td>
+<td>Device's unique 64-bit ID. Ours is derived from the chip's UID.</td>
+</tr>
+<tr>
+<td>DevNonce</td>
+<td>Join counter sent in each JoinRequest; in 1.0.4 it must never repeat.</td>
+</tr>
+<tr>
+<td>DR</td>
+<td>Data Rate index: a SF/bandwidth pair defined per region. AU915 uplink DR0 = SF12/125 to DR5 = SF7/125, DR6 = SF8/500.</td>
+</tr>
+<tr>
+<td>Dwell time</td>
+<td>Maximum time on air per transmission; AU915 devices boot with a 400 ms uplink limit.</td>
+</tr>
+<tr>
+<td>EIRP</td>
+<td>Effective radiated power: conducted power plus antenna gain. LoRaWAN TX power indices are in EIRP.</td>
+</tr>
+<tr>
+<td>FCnt</td>
+<td>Frame counter, up and down, protecting against replay.</td>
+</tr>
+<tr>
+<td>FOpts / FPort</td>
+<td>Up to 15 bytes of MAC commands piggy-backed on a frame / application port (0 = MAC commands only).</td>
+</tr>
+<tr>
+<td>FSB / sub-band</td>
+<td>Group of 8 125 kHz channels plus one 500 kHz channel; an 8-channel gateway serves one.</td>
+</tr>
+<tr>
+<td>Gateway EUI</td>
+<td>Gateway's 64-bit ID; ours is 00800000A00006DD (from the LoRa card).</td>
+</tr>
+<tr>
+<td>HP / LP PA</td>
+<td>STM32WL's high-power (up to 22 dBm) and low-power (up to 15 dBm) amplifiers; the board file says which are wired.</td>
+</tr>
+<tr>
+<td>Installation margin</td>
+<td>Safety margin a server keeps above the required SNR when running ADR (ChirpStack 10 dB, TTN 15 dB).</td>
+</tr>
+<tr>
+<td>JoinEUI (AppEUI)</td>
+<td>ID of the join server the device joins through; ST's examples use 0101010101010101.</td>
+</tr>
+<tr>
+<td>L2 / TS001</td>
+<td>The LoRaWAN link-layer specification; versions 1.0.3 and 1.0.4 matter here.</td>
+</tr>
+<tr>
+<td>LBM</td>
+<td>LoRa Basics Modem: Semtech's newer device stack, used by CubeWL v1.5.0 and later.</td>
+</tr>
+<tr>
+<td>LCTT</td>
+<td>LoRa Certification Test Tool, used by test houses for LoRa Alliance certification.</td>
+</tr>
+<tr>
+<td>LinkADRReq / LinkADRAns</td>
+<td>MAC command setting DR, TX power, channel mask and NbTrans / the device's 1-byte accept-reject answer.</td>
+</tr>
+<tr>
+<td>LmHandler</td>
+<td>ST/Semtech's high-level LoRaWAN API between the application and the MAC.</td>
+</tr>
+<tr>
+<td>LoRa</td>
+<td>Semtech's chirp spread-spectrum radio modulation (the physical layer).</td>
+</tr>
+<tr>
+<td>LoRa Alliance</td>
+<td>The body that publishes LoRaWAN specs and runs device certification.</td>
+</tr>
+<tr>
+<td>LoRaMac-node</td>
+<td>Semtech's reference end-device LoRaWAN stack, the MAC core inside ST's stack up to CubeWL v1.4.0.</td>
+</tr>
+<tr>
+<td>LoRaWAN</td>
+<td>The MAC protocol and network architecture on top of LoRa.</td>
+</tr>
+<tr>
+<td>LSM110A</td>
+<td>SJIT's LoRaWAN module built on an STM32WLE5CC; the customer's hardware.</td>
+</tr>
+<tr>
+<td>MAC command</td>
+<td>Control message between server and device (e.g. LinkADRReq, TxParamSetupReq, DevStatusReq).</td>
+</tr>
+<tr>
+<td>MIC</td>
+<td>Message Integrity Code: a cryptographic check on every frame.</td>
+</tr>
+<tr>
+<td>NbTrans</td>
+<td>Number of times each uplink is sent (1-15), set by the server through LinkADRReq.</td>
+</tr>
+<tr>
+<td>NetID</td>
+<td>Network operator ID; the Conduit's built-in server uses 000000.</td>
+</tr>
+<tr>
+<td>Network server</td>
+<td>Server that runs the LoRaWAN MAC for devices: sessions, ADR, MAC commands, downlink timing.</td>
+</tr>
+<tr>
+<td>NVM context</td>
+<td>ST's saved MAC state in flash, restored at boot so the device can skip rejoining.</td>
+</tr>
+<tr>
+<td>OTAA</td>
+<td>Over-The-Air Activation: the device joins with a JoinRequest/JoinAccept exchange. Our bench device uses it; the customer's activation mode is still to be confirmed.</td>
+</tr>
+<tr>
+<td>Packet forwarder</td>
+<td>Gateway program relaying radio packets to a server (<code>lora_pkt_fwd</code>, Semtech UDP).</td>
+</tr>
+<tr>
+<td>RBI</td>
+<td>ST's <code>radio_board_if</code>: board file for RF switch and amplifier configuration.</td>
+</tr>
+<tr>
+<td>RP002</td>
+<td>LoRaWAN Regional Parameters spec (1.0.3 here): channels, DRs and power tables per region.</td>
+</tr>
+<tr>
+<td>RSSI / SNR</td>
+<td>Received signal strength (dBm) / signal-to-noise ratio (dB); ADR is driven by SNR.</td>
+</tr>
+<tr>
+<td>RX1 / RX2</td>
+<td>Class A receive windows after an uplink: RX1 after 1 s (default) on a linked channel, RX2 1 s later on 923.3 MHz in AU915.</td>
+</tr>
+<tr>
+<td>RX1DROffset</td>
+<td>Offset from the uplink DR to the RX1 downlink DR, set at join.</td>
+</tr>
+<tr>
+<td>Semtech</td>
+<td>Inventor of LoRa; makes the radios and the reference software (LoRaMac-node, packet forwarder, Basic Station, LBM).</td>
+</tr>
+<tr>
+<td>Semtech UDP</td>
+<td>Original gateway-to-server protocol on UDP port 1700, used by our Conduit.</td>
+</tr>
+<tr>
+<td>SF</td>
+<td>Spreading factor, SF7 to SF12: higher is slower and longer range.</td>
+</tr>
+<tr>
+<td>SubGHz_Phy</td>
+<td>ST's radio driver layer for the STM32WL's built-in radio.</td>
+</tr>
+<tr>
+<td>ToA</td>
+<td>Time on air of one transmission.</td>
+</tr>
+<tr>
+<td>TTN / TTS</td>
+<td>The Things Network, the community deployment of The Things Stack network server by The Things Industries.</td>
+</tr>
+<tr>
+<td>TX power index</td>
+<td>LoRaWAN power level: index n = max EIRP minus 2n dB (AU915: 30 dBm at 0, 2 dBm at 14).</td>
+</tr>
+<tr>
+<td>TxParamSetupReq</td>
+<td>MAC command setting dwell-time limits and max EIRP; key in AU915.</td>
+</tr>
+</tbody>
+</table>
+<h2>Sources</h2>
+<p>Source code was read from fresh clones: STM32CubeWL v1.4.0, ChirpStack v4.20.0 and The Things Stack (lorawan-stack). Device and gateway facts come from our own bench.</p>
+<ul>
+<li><a href="https://community.st.com/stm32-mcus-wireless-35/stm32wl-lorawan-mw-2-5-0-mac-1-0-4-au915-freezes-uplinks-after-linkadrreq-on-chirpstack-stable-on-ttn-167559">ST Community thread 167559</a>: STM32WL AU915 stops after LinkADRReq on ChirpStack, stable on TTN</li>
+<li><a href="https://github.com/STMicroelectronics/STM32CubeWL">STM32CubeWL on GitHub</a>: release notes and source</li>
+<li><a href="https://github.com/chirpstack/chirpstack/blob/master/chirpstack/src/adr/default.rs">ChirpStack default ADR (<code>adr/default.rs</code>)</a> and <a href="https://github.com/chirpstack/chirpstack/blob/master/chirpstack/configuration/region_au915_1.toml"><code>region_au915_1.toml</code></a></li>
+<li><a href="https://github.com/chirpstack/chirpstack/issues/537">ChirpStack issue #537</a>: multiple LinkADRReq right after join is intended</li>
+<li><a href="https://github.com/chirpstack/chirpstack/issues/1015">ChirpStack issue #1015</a>: LinkADRReq suppressed after two NACKs; 4.20 stops counting TX-power NACKs</li>
+<li><a href="https://github.com/chirpstack/chirpstack/issues/850">ChirpStack issue #850</a>: server's TX-power belief goes stale</li>
+<li><a href="https://forum.chirpstack.io/t/linkadrreq-for-au915-minimum-data-rate/5338">ChirpStack forum 5338</a> and <a href="https://forum.chirpstack.io/t/stm32wl-sdk-issue/12265">12265</a>: AU915 minimum DR and an STM32WL device that worked on TTN only (ChirpStack v3)</li>
+<li><a href="https://forum.chirpstack.io/t/when-both-dwelltime400ms-set-to-false-in-chipstack-ns-configuration-no-txparamsetupreq-sent-to-device/14969">ChirpStack forum 14969</a>: no TxParamSetupReq with dwell flags off</li>
+<li><a href="https://forum.chirpstack.io/t/adr-issue-dropping-devices/15588">ChirpStack forum 15588</a>: AU915 ADR dropping devices, caused by server latency</li>
+<li><a href="https://www.thethingsindustries.com/docs/concepts/features/lorawan/adr/">The Things Stack ADR docs</a> and <a href="https://www.thethingsindustries.com/docs/hardware/devices/configuring-devices/mac-settings/">MAC settings docs</a></li>
+<li><a href="https://github.com/TheThingsNetwork/lorawan-frequency-plans/blob/master/frequency-plans.yml">TTN frequency plans</a>: <code>AU_915_928_FSB_2</code> and <code>AU_915_928_FSB_2_BR</code></li>
+<li><a href="https://www.thethingsnetwork.org/forum/t/current-and-upcoming-community-clusters/43718">TTN community clusters</a></li>
+<li><a href="https://github.com/Lora-net/LoRaMac-node/issues/531">LoRaMac-node issues #531</a>, <a href="https://github.com/Lora-net/LoRaMac-node/issues/533">#533</a>, <a href="https://github.com/Lora-net/LoRaMac-node/issues/1211">#1211</a>, <a href="https://github.com/Lora-net/LoRaMac-node/issues/1304">#1304</a></li>
+<li><a href="https://github.com/Lora-net/LoRaMac-node/wiki/releases-pre-certification-results">LoRaMac-node pre-certification results</a></li>
+<li><a href="https://lora-alliance.org/wp-content/uploads/2021/05/RP002-1.0.3-FINAL-1.pdf">RP002-1.0.3 Regional Parameters</a></li>
+<li><a href="https://github.com/Support-SJI/LSM110A">SJIT LSM110A repository</a>: datasheet, certificates, <code>radio_board_if.h</code></li>
+<li><a href="https://multitech.com/wp-content/uploads/rss/mPower_Software_Documentation/mPower/AEP_Software_Guide/pdf/S000727_mPower_Conduit_AEP_Software_Guide.pdf">MultiTech AEP software guide S000727</a></li>
+<li><a href="https://ib-lenhardt.com/news/anatel-6-db-bandwidth-exemption-to-end-on-october-6-2026">ANATEL 6 dB bandwidth exemption ending</a> (secondary source)</li>
+</ul></main></body></html>
