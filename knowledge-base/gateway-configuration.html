@@ -1,0 +1,198 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Gateway Configuration: MultiTech Conduit</title>
+<style>
+:root{color-scheme:dark;--bg:#161614;--ink:#ecebe7;--quiet:#a9a69e;--rule:#3a3935;--head:#24231f;--cap:#1b1a18;--link:#7db2f5}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
+main{max-width:860px;margin:0 auto;padding:32px 16px 64px}
+h1{font-size:28px;line-height:1.25;margin:0 0 4px}
+h1+p{color:var(--quiet);margin-top:0}
+h2{font-size:21px;margin:44px 0 12px;padding-top:12px;border-top:1px solid var(--rule)}
+table{border-collapse:collapse;width:100%;font-size:14.5px;margin:12px 0 20px}
+th,td{border:1px solid var(--rule);padding:7px 10px;vertical-align:top;text-align:left}
+th{background:var(--head)}
+td:first-child{white-space:nowrap;font-weight:600}
+@media (max-width:640px){td:first-child{white-space:normal}}
+figure{margin:24px 0 8px;border:1px solid var(--rule);border-radius:10px;overflow:hidden}
+figure svg{display:block;width:100%;height:auto}
+figcaption{font-size:13px;color:var(--quiet);padding:8px 12px;border-top:1px solid var(--rule);background:var(--cap)}
+a{color:var(--link)}
+code{background:var(--head);padding:1px 4px;border-radius:4px}
+pre{background:var(--head);border:1px solid var(--rule);border-radius:8px;padding:12px 14px;overflow-x:auto;font-size:13px;line-height:1.45}
+pre code{background:none;padding:0}
+</style></head><body><main><h1>Gateway Configuration: MultiTech Conduit</h1>
+<p>Oct 27, 2026. What we set up on the bench gateway today, why, and how to check it.</p>
+
+<h2>The big picture</h2>
+<p>A gateway never makes ADR decisions itself; the network server it feeds does. Our MultiTech Conduit can either run its own built-in network server or forward every packet to an outside one. That one setting decides which ADR algorithm drives our board.</p>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 330" role="img" aria-label="The gateway's LoRa mode decides which network server runs ADR" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><defs><marker id="mode-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7c7970"></path></marker></defs><text x="24" y="28" font-size="15" font-weight="600" fill="#ecebe7">The gateway's LoRa mode decides which network server runs ADR</text><text x="24" y="56" font-size="11.5" font-weight="600" fill="#ecebe7">Today: built-in network server mode</text><rect x="176" y="66" width="384" height="88" rx="10" fill="none" stroke="#4a4843" stroke-width="1.25" stroke-dasharray="4 4"></rect><text x="188" y="82" font-size="11.5" fill="#a9a69e">Conduit gateway, 192.168.28.28</text><g><rect x="24" y="92" width="120" height="52" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="84" y="114" text-anchor="middle" font-weight="600" fill="#ecebe7">Our board</text><text x="84" y="131" text-anchor="middle" font-size="11.5" fill="#a9a69e">NUCLEO-WL55JC</text></g><g><rect x="188" y="92" width="150" height="52" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="263" y="114" text-anchor="middle" font-weight="600" fill="#ecebe7">Packet forwarder</text><text x="263" y="131" text-anchor="middle" font-size="11.5" fill="#a9a69e">lora_pkt_fwd</text></g><g><rect x="398" y="92" width="150" height="52" rx="8" fill="#5c9df2" fill-opacity="0.12" stroke="#5c9df2" stroke-width="2"></rect><text x="473" y="114" text-anchor="middle" font-weight="600" fill="#ecebe7">Network server</text><text x="473" y="131" text-anchor="middle" font-size="11.5" fill="#ecebe7">built-in, runs ADR</text></g><g><rect x="592" y="92" width="144" height="52" rx="8" fill="none" stroke="#4a4843" stroke-width="1.25"></rect><text x="664" y="114" text-anchor="middle" font-weight="600" fill="#a9a69e">ChirpStack</text><text x="664" y="131" text-anchor="middle" font-size="11.5" fill="#a9a69e">idle</text></g><g fill="none" stroke="#7c7970" stroke-width="1.25"><path d="M144 118H186" marker-end="url(#mode-arrow)"></path><path d="M338 118H396" marker-end="url(#mode-arrow)"></path></g><text x="165" y="110" text-anchor="middle" font-size="10.5" fill="#a9a69e">radio</text><text x="367" y="110" text-anchor="middle" font-size="10" fill="#a9a69e">127.0.0.1</text><text x="24" y="186" font-size="11.5" font-weight="600" fill="#ecebe7">Next: packet forwarder mode</text><rect x="176" y="196" width="384" height="88" rx="10" fill="none" stroke="#4a4843" stroke-width="1.25" stroke-dasharray="4 4"></rect><text x="188" y="212" font-size="11.5" fill="#a9a69e">Conduit gateway, 192.168.28.28</text><text x="664" y="212" text-anchor="middle" font-size="11.5" fill="#a9a69e">workstation 192.168.28.86</text><g><rect x="24" y="222" width="120" height="52" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="84" y="244" text-anchor="middle" font-weight="600" fill="#ecebe7">Our board</text><text x="84" y="261" text-anchor="middle" font-size="11.5" fill="#a9a69e">NUCLEO-WL55JC</text></g><g><rect x="188" y="222" width="150" height="52" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="263" y="244" text-anchor="middle" font-weight="600" fill="#ecebe7">Packet forwarder</text><text x="263" y="261" text-anchor="middle" font-size="11.5" fill="#a9a69e">lora_pkt_fwd</text></g><g><rect x="398" y="222" width="150" height="52" rx="8" fill="none" stroke="#4a4843" stroke-width="1.25"></rect><text x="473" y="244" text-anchor="middle" font-weight="600" fill="#a9a69e">Network server</text><text x="473" y="261" text-anchor="middle" font-size="11.5" fill="#a9a69e">stopped</text></g><g><rect x="592" y="222" width="144" height="52" rx="8" fill="#5c9df2" fill-opacity="0.12" stroke="#5c9df2" stroke-width="2"></rect><text x="664" y="244" text-anchor="middle" font-weight="600" fill="#ecebe7">ChirpStack</text><text x="664" y="261" text-anchor="middle" font-size="11.5" fill="#ecebe7">runs ADR</text></g><g fill="none" stroke="#7c7970" stroke-width="1.25"><path d="M144 248H186" marker-end="url(#mode-arrow)"></path><path d="M263 274V300H664V276" marker-end="url(#mode-arrow)"></path></g><text x="165" y="240" text-anchor="middle" font-size="10.5" fill="#a9a69e">radio</text><text x="463" y="318" text-anchor="middle" font-size="11.5" fill="#a9a69e">Semtech UDP, port 1700, over the office LAN</text></svg>
+<figcaption>Conduit LoRa modes: built-in network server today, packet forwarder next</figcaption></figure>
+<p>The board, the radio and the channels stay the same in both modes; only the ADR decision maker changes. That is the stakeholder's situation in miniature: one firmware, two network servers, different behaviour.</p>
+
+<h2>Bench network</h2>
+<p>The gateway came with a fixed address, 192.168.137.2, that the workstation could not reach. We made it a DHCP client on the office LAN, so it now behaves like any other host there.</p>
+<table>
+<thead><tr><th>Setting</th><th>Before</th><th>After (today)</th></tr></thead>
+<tbody>
+<tr><td>eth0</td><td>LAN, static 192.168.137.2, no default route</td><td>LAN, DHCP client: 192.168.28.28, default route 192.168.28.1</td></tr>
+<tr><td>DHCP server on eth0</td><td>off</td><td>off. Hard rule: the gateway never hands out addresses</td></tr>
+<tr><td>Web UI and SSH</td><td>allowed on the LAN side, but unreachable</td><td>unchanged, now reachable: <code>ssh admin@192.168.28.28</code></td></tr>
+<tr><td>Config backup</td><td>none</td><td><code>/var/config/db.json.bak-20261027</code> on the gateway</td></tr>
+</tbody></table>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 344" role="img" aria-label="Bench wiring: one office LAN and two USB cables" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><defs><marker id="net-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7c7970"></path></marker></defs><text x="24" y="28" font-size="15" font-weight="600" fill="#ecebe7">Bench wiring: one office LAN and two USB cables</text><g><rect x="24" y="48" width="190" height="56" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="119" y="71" text-anchor="middle" font-weight="600" fill="#ecebe7">Office router</text><text x="119" y="89" text-anchor="middle" font-size="11.5" fill="#a9a69e">192.168.28.1, DHCP server</text></g><g stroke="#7c7970" stroke-width="1.25"><line x1="60" x2="736" y1="136" y2="136"></line><line x1="119" x2="119" y1="104" y2="136"></line><line x1="375" x2="375" y1="136" y2="170"></line><line x1="631" x2="631" y1="136" y2="170" stroke-dasharray="3 3"></line></g><text x="736" y="128" text-anchor="end" font-size="11.5" fill="#a9a69e">office LAN 192.168.28.0/24</text><text x="639" y="157" font-size="10.5" fill="#a9a69e">Wi-Fi</text><g><rect x="24" y="170" width="200" height="72" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="124" y="193" text-anchor="middle" font-weight="600" fill="#ecebe7">Our board</text><text x="124" y="211" text-anchor="middle" font-size="11.5" fill="#a9a69e">NUCLEO-WL55JC</text><text x="124" y="228" text-anchor="middle" font-size="11.5" fill="#a9a69e">LoRa only, no IP address</text></g><g><rect x="270" y="170" width="210" height="72" rx="8" fill="#5c9df2" fill-opacity="0.12" stroke="#5c9df2" stroke-width="2"></rect><text x="375" y="193" text-anchor="middle" font-weight="600" fill="#ecebe7">Conduit gateway</text><text x="375" y="211" text-anchor="middle" font-size="11.5" fill="#ecebe7">eth0 192.168.28.28</text><text x="375" y="228" text-anchor="middle" font-size="11.5" fill="#ecebe7">DHCP client only</text></g><g><rect x="526" y="170" width="210" height="72" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="631" y="193" text-anchor="middle" font-weight="600" fill="#ecebe7">Workstation</text><text x="631" y="211" text-anchor="middle" font-size="11.5" fill="#a9a69e">192.168.28.86</text><text x="631" y="228" text-anchor="middle" font-size="11.5" fill="#a9a69e">ChirpStack in Docker</text></g><line x1="224" x2="270" y1="206" y2="206" stroke="#5c9df2" stroke-width="1.25" stroke-dasharray="4 3"></line><text x="247" y="198" text-anchor="middle" font-size="10.5" fill="#a9a69e">LoRa</text><g fill="none" stroke="#7c7970" stroke-width="1.25"><path d="M580 242V276H420V244" marker-end="url(#net-arrow)"></path><path d="M690 242V304H124V244" marker-end="url(#net-arrow)"></path></g><text x="500" y="270" text-anchor="middle" font-size="11" fill="#a9a69e">USB console (ttyACM1)</text><text x="290" y="298" text-anchor="middle" font-size="11" fill="#a9a69e">USB ST-LINK (ttyACM2): trace and flashing</text><text x="24" y="334" font-size="11.5" fill="#a9a69e">The gateway takes its address from the router and never hands addresses out: nothing may listen on UDP 67.</text></svg>
+<figcaption>Bench wiring and addresses</figcaption></figure>
+<p>We chose LAN + DHCP client rather than WAN because the gateway's remote-access settings allow the web UI and SSH on LAN ports only; WAN would have meant opening them up.</p>
+
+<h2>How AEP applies a change</h2>
+<p>AEP's web UI is a thin layer over a local REST API, and our scripts call the same API. A change is staged in memory and only becomes permanent with <code>save_restart</code>, which saves it and reboots the gateway.</p>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 266" role="img" aria-label="AEP stages a change in memory; save_restart makes it permanent" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><defs><marker id="aep-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7c7970"></path></marker></defs><text x="24" y="28" font-size="15" font-weight="600" fill="#ecebe7">AEP stages a change in memory; save_restart makes it permanent</text><g><rect x="24" y="56" width="150" height="74" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="99" y="82" text-anchor="middle" font-weight="600" fill="#ecebe7">Web UI or script</text><text x="99" y="100" text-anchor="middle" font-size="11.5" fill="#a9a69e">PUT /api/...</text><text x="99" y="116" text-anchor="middle" font-size="11.5" fill="#a9a69e">whole element</text></g><g><rect x="206" y="56" width="150" height="74" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="281" y="82" text-anchor="middle" font-weight="600" fill="#ecebe7">API, staged</text><text x="281" y="100" text-anchor="middle" font-size="11.5" fill="#a9a69e">in memory only</text><text x="281" y="116" text-anchor="middle" font-size="11.5" fill="#a9a69e">gone on reboot</text></g><g><rect x="388" y="56" width="150" height="74" rx="8" fill="#f2b84b" fill-opacity="0.10" stroke="#f2b84b" stroke-width="2"></rect><text x="463" y="82" text-anchor="middle" font-weight="600" fill="#ecebe7">save_restart</text><text x="463" y="100" text-anchor="middle" font-size="11.5" fill="#ecebe7">writes db.json</text><text x="463" y="116" text-anchor="middle" font-size="11.5" fill="#ecebe7">reboots, 2-3 min</text></g><g><rect x="570" y="56" width="166" height="74" rx="8" fill="#5c9df2" fill-opacity="0.12" stroke="#5c9df2" stroke-width="2"></rect><text x="653" y="82" text-anchor="middle" font-weight="600" fill="#ecebe7">Boot scripts</text><text x="653" y="100" text-anchor="middle" font-size="11.5" fill="#ecebe7">read the local API</text><text x="653" y="116" text-anchor="middle" font-size="11.5" fill="#ecebe7">build running config</text></g><g><rect x="24" y="166" width="332" height="48" rx="8" fill="none" stroke="#4a4843" stroke-width="1.25"></rect><text x="190" y="186" text-anchor="middle" font-weight="600" fill="#ecebe7">Undo</text><text x="190" y="203" text-anchor="middle" font-size="11.5" fill="#a9a69e">copy a db.json backup over it, then reboot</text></g><g><rect x="388" y="166" width="348" height="48" rx="8" fill="#2c2b28" stroke="#7c7970" stroke-width="1.25"></rect><text x="562" y="186" text-anchor="middle" font-weight="600" fill="#ecebe7">/var/config/db.json</text><text x="562" y="203" text-anchor="middle" font-size="11.5" fill="#a9a69e">saved config, survives reboots</text></g><g fill="none" stroke="#7c7970" stroke-width="1.25"><path d="M174 93H204" marker-end="url(#aep-arrow)"></path><path d="M356 93H386" marker-end="url(#aep-arrow)"></path><path d="M538 93H568" marker-end="url(#aep-arrow)"></path><path d="M463 130V164" marker-end="url(#aep-arrow)"></path><path d="M653 166V132" marker-end="url(#aep-arrow)"></path></g><text x="24" y="240" font-size="11.5" fill="#a9a69e">AEP 1.7.4 quirks: there is no save_apply; a PUT needs the whole element and -H 'Expect:';</text><text x="24" y="256" font-size="11.5" fill="#a9a69e">the save_restart POST needs a body, even an empty one (-d '').</text></svg>
+<figcaption>How a configuration change travels through AEP</figcaption></figure>
+<table>
+<thead><tr><th>What we saw</th><th>Cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>404 "data not found"</td><td>PUT of a partial element, or of a whole collection</td><td>GET the element, change it, PUT it back whole</td></tr>
+<tr><td>417 Expectation Failed</td><td>curl sends <code>Expect: 100-continue</code> with larger bodies; the old web server refuses it</td><td>add <code>-H 'Expect:'</code></td></tr>
+<tr><td>411 Length Required</td><td>POST with no body at all</td><td>add <code>-d ''</code></td></tr>
+<tr><td>save_apply not found</td><td>AEP 1.7.4 only has <code>save</code> and <code>save_restart</code></td><td>use <code>save_restart</code></td></tr>
+</tbody></table>
+<p>On the gateway itself, <code>http://127.0.0.1/api</code> answers without a login. AEP's own boot scripts read it that way, and so does our <code>watch-board.py</code>.</p>
+
+<h2>LoRa modes</h2>
+<table>
+<thead><tr><th>Term</th><th>What it means</th></tr></thead>
+<tbody>
+<tr><td>Packet forwarder</td><td><code>lora_pkt_fwd</code>, running in both modes. It takes packets from the LoRa card and sends them to a network server over Semtech UDP, and transmits the downlinks it gets back.</td></tr>
+<tr><td>Built-in network server</td><td><code>lora-network-server</code>, MultiTech's own LoRaWAN server inside AEP. In network server mode the forwarder talks to it locally, on 127.0.0.1 ports 1780 and 1782. <strong>(ADR)</strong></td></tr>
+<tr><td>Network server mode</td><td>AEP setting <code>packetForwarderMode = false</code>. Joins, keys and ADR are all handled on the gateway. Our setup today.</td></tr>
+<tr><td>Packet forwarder mode</td><td><code>packetForwarderMode = true</code>. The built-in server stops; packets go to <code>serverAddress</code> on UDP 1700, which will be our ChirpStack.</td></tr>
+<tr><td>Semtech UDP</td><td>The original gateway-to-server protocol: JSON over UDP port 1700, unencrypted. ChirpStack's gateway bridge speaks it.</td></tr>
+<tr><td>Gateway EUI</td><td>The gateway's 64-bit ID, sent with every packet: <code>00800000A00006DD</code>, set at the factory on the LoRa card. ChirpStack must be given exactly this value.</td></tr>
+</tbody></table>
+<p>At boot in packet forwarder mode, AEP's start-up script (<code>/etc/init.d/lora-network-server</code>, read on the gateway today):</p>
+<ol>
+<li>reads the LoRa settings from the local API;</li>
+<li>runs the network server once, only to generate the radio configuration;</li>
+<li>writes the server address and ports into <code>/var/run/lora/*.json</code>;</li>
+<li>starts the packet forwarder.</li>
+</ol>
+
+<h2>Radio channels: sub-band 2</h2>
+<p>An 8-channel gateway hears one AU915 sub-band only. Gateway, network server and board must all use the same one, or uplinks are lost without any error message.</p>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 262" role="img" aria-label="Sub-band 2: the nine channels our gateway listens to" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><text x="24" y="28" font-size="15" font-weight="600" fill="#ecebe7">Sub-band 2: the nine channels our gateway listens to</text><g fill="none" stroke="#7c7970" stroke-width="1.25"><path d="M92 84V76H366V84"></path><path d="M394 84V76H668V84"></path></g><text x="229" y="68" text-anchor="middle" font-size="11.5" fill="#ecebe7">radio_0 tuned to 917.2 MHz</text><text x="531" y="68" text-anchor="middle" font-size="11.5" fill="#ecebe7">radio_1 tuned to 918.0 MHz</text><g fill="#5c9df2" fill-opacity="0.14" stroke="#5c9df2" stroke-width="2"><rect x="91.9" y="92" width="47.2" height="40" rx="5"></rect><rect x="167.5" y="92" width="47.2" height="40" rx="5"></rect><rect x="243.1" y="92" width="47.2" height="40" rx="5"></rect><rect x="318.6" y="92" width="47.2" height="40" rx="5"></rect><rect x="394.2" y="92" width="47.2" height="40" rx="5"></rect><rect x="469.7" y="92" width="47.2" height="40" rx="5"></rect><rect x="545.3" y="92" width="47.2" height="40" rx="5"></rect><rect x="620.8" y="92" width="47.2" height="40" rx="5"></rect></g><g text-anchor="middle" font-size="11" font-weight="600" fill="#ecebe7"><text x="115.6" y="116">ch 8</text><text x="191.1" y="116">ch 9</text><text x="266.7" y="116">ch 10</text><text x="342.2" y="116">ch 11</text><text x="417.8" y="116">ch 12</text><text x="493.3" y="116">ch 13</text><text x="568.9" y="116">ch 14</text><text x="644.4" y="116">ch 15</text></g><g text-anchor="middle" font-size="10" fill="#a9a69e"><text x="115.6" y="148">916.8</text><text x="191.1" y="148">917.0</text><text x="266.7" y="148">917.2</text><text x="342.2" y="148">917.4</text><text x="417.8" y="148">917.6</text><text x="493.3" y="148">917.8</text><text x="568.9" y="148">918.0</text><text x="644.4" y="148">918.2</text></g><text x="700" y="148" font-size="10" fill="#a9a69e">MHz</text><rect x="285.6" y="166" width="188.9" height="30" rx="5" fill="#f28a5c" fill-opacity="0.14" stroke="#f28a5c" stroke-width="2"></rect><text x="380" y="186" text-anchor="middle" font-size="11" font-weight="600" fill="#ecebe7">ch 65: 500 kHz at 917.5 MHz</text><text x="24" y="226" font-size="11.5" fill="#a9a69e">125 kHz channels drawn to scale. MultiTech counts sub-bands from 1, ChirpStack from 0 (au915_1), TTN calls it FSB 2.</text><text x="24" y="244" font-size="11.5" fill="#a9a69e">Our board's channel mask FF00.0000.0000.0000.0002 turns on exactly these nine: ch 8-15 and ch 65.</text></svg>
+<figcaption>Sub-band 2 to scale, with the gateway's two radios</figcaption></figure>
+<table>
+<thead><tr><th>Where</th><th>Setting</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Gateway, network server</td><td><code>lora.frequencySubBand</code></td><td>2: channels 8-15 + 65</td></tr>
+<tr><td>Gateway, packet forwarder</td><td><code>packetForwarder.frequencySubBand</code></td><td>was 1 (channels 0-7); <code>conduit-lora-mode.sh forwarder</code> sets 2</td></tr>
+<tr><td>Our ChirpStack</td><td><code>enabled_regions</code></td><td><code>au915_1</code> (916.8 MHz and up)</td></tr>
+<tr><td>Board firmware</td><td>sub-band, channel mask</td><td>2, <code>FF00.0000.0000.0000.0002</code></td></tr>
+<tr><td>TTN</td><td>frequency plan</td><td><code>AU_915_928_FSB_2</code></td></tr>
+</tbody></table>
+<p>Today's catch: the forwarder section was still on sub-band 1. Switching modes without fixing it would have made the gateway deaf to our board. ChirpStack's <code>au915_0</code> region is sub-band 1 too (it starts at 915.2 MHz), so which region the stakeholder's ChirpStack uses is worth asking.</p>
+
+<h2>ADR on our board today</h2>
+<p>With the built-in server in charge, our board has been moved to DR3 and TX power index 10.</p>
+<table>
+<thead><tr><th>Parameter</th><th>Value</th><th>Seen in</th></tr></thead>
+<tbody>
+<tr><td>Data rate</td><td>DR3 (SF9, 125 kHz)</td><td>board trace and gateway</td></tr>
+<tr><td>TX power</td><td>index 10: EIRP 10 dBm, 7 dBm at the chip, low-power amplifier</td><td>board trace</td></tr>
+<tr><td>Last ADR command</td><td><code>03 3A 00 FF 01</code> (LinkADRReq)</td><td>gateway syslog</td></tr>
+<tr><td>Earlier ADR command</td><td><code>03 39 00 FF 01</code>: the same, but TX index 9</td><td>gateway syslog</td></tr>
+<tr><td>Signal at the gateway</td><td>RSSI about -73 dBm, SNR 8 to 14 dB</td><td>gateway</td></tr>
+<tr><td>Packet error rate</td><td>0 to 2.6 %</td><td>gateway syslog (<code>PER</code>)</td></tr>
+<tr><td>Uplinks</td><td>every 15 s, unconfirmed, 5 bytes on port 2</td><td>board trace</td></tr>
+<tr><td>Built-in server limits</td><td>ADR capped at DR3 (<code>maxDatarate</code>), ADR step setting 30</td><td>gateway config</td></tr>
+</tbody></table>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 300" role="img" aria-label="Decoding the ADR command our board gets today" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><defs><marker id="pwr-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7c7970"></path></marker></defs><text x="24" y="28" font-size="15" font-weight="600" fill="#ecebe7">Decoding the ADR command our board gets today: 03 3A 00 FF 01</text><g fill="none" stroke="#7c7970" stroke-width="1.25"><rect x="24" y="48" width="110" height="44" rx="6"></rect><rect x="146" y="48" width="110" height="44" rx="6" fill="#5c9df2" fill-opacity="0.12" stroke="#5c9df2" stroke-width="2"></rect><rect x="268" y="48" width="110" height="44" rx="6"></rect><rect x="390" y="48" width="110" height="44" rx="6"></rect><rect x="512" y="48" width="110" height="44" rx="6"></rect></g><g text-anchor="middle" font-size="15" font-weight="600" fill="#ecebe7"><text x="79" y="76">03</text><text x="201" y="76">3A</text><text x="323" y="76">00</text><text x="445" y="76">FF</text><text x="567" y="76">01</text></g><path d="M268 100V106H500V100" fill="none" stroke="#7c7970" stroke-width="1.25"></path><g text-anchor="middle" font-size="11.5" fill="#a9a69e"><text x="79" y="118">CID 0x03</text><text x="79" y="134">LinkADRReq</text><text x="201" y="118">DR 3 (high 4 bits)</text><text x="201" y="134">TX idx 10 (low 4)</text><text x="384" y="124">ChMask 0xFF00, low byte first</text><text x="384" y="140">channels 8-15 on</text><text x="567" y="118">ChMaskCntl 0</text><text x="567" y="134">NbTrans 1</text></g><text x="24" y="182" font-weight="600" fill="#ecebe7">What TX power index 10 means on the STM32WL</text><g><rect x="24" y="196" width="160" height="56" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="104" y="219" text-anchor="middle" font-weight="600" fill="#ecebe7">Index 10</text><text x="104" y="237" text-anchor="middle" font-size="11.5" fill="#a9a69e">from LinkADRReq</text></g><g><rect x="208" y="196" width="160" height="56" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="288" y="219" text-anchor="middle" font-weight="600" fill="#ecebe7">EIRP 10 dBm</text><text x="288" y="237" text-anchor="middle" font-size="11.5" fill="#a9a69e">30 - 2 x 10</text></g><g><rect x="392" y="196" width="160" height="56" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="472" y="219" text-anchor="middle" font-weight="600" fill="#ecebe7">7 dBm at the chip</text><text x="472" y="237" text-anchor="middle" font-size="11.5" fill="#a9a69e">minus 2.15 dBi antenna</text></g><g><rect x="576" y="196" width="160" height="56" rx="8" fill="#f2b84b" fill-opacity="0.10" stroke="#f2b84b" stroke-width="2"></rect><text x="656" y="219" text-anchor="middle" font-weight="600" fill="#ecebe7">Low-power amp</text><text x="656" y="237" text-anchor="middle" font-size="11.5" fill="#ecebe7">used at 15 dBm and below</text></g><g fill="none" stroke="#7c7970" stroke-width="1.25"><path d="M184 224H206" marker-end="url(#pwr-arrow)"></path><path d="M368 224H390" marker-end="url(#pwr-arrow)"></path><path d="M552 224H574" marker-end="url(#pwr-arrow)"></path></g><text x="24" y="284" font-size="11.5" fill="#a9a69e">Indices 6 to 14 (15 dBm and below) all run on the low-power amplifier: the path to verify on the stakeholder's board.</text></svg>
+<figcaption>LinkADRReq bytes and the TX power path</figcaption></figure>
+<p>The built-in server has already walked our board onto the low-power amplifier, and the board keeps working because the Nucleo wires both amplifiers. ChirpStack's default ADR goes further and faster, down to index 14 (see the primer, hypothesis 1).</p>
+
+<h2>Checking that frames get through</h2>
+<figure><svg xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" viewBox="0 0 760 230" role="img" aria-label="Three places to check that a frame got through" font-size="13"><rect width="100%" height="100%" fill="#1f1e1c"/><defs><marker id="obs-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7c7970"></path></marker></defs><text x="24" y="28" font-size="15" font-weight="600" fill="#ecebe7">Three places to check that a frame got through</text><g><rect x="24" y="52" width="216" height="112" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="132" y="76" text-anchor="middle" font-weight="600" fill="#ecebe7">Board trace</text><text x="132" y="94" text-anchor="middle" font-size="11.5" fill="#a9a69e">ttyACM2, [UL] lines</text><text x="132" y="118" text-anchor="middle" font-size="11.5" fill="#ecebe7">FCnt sent, DR, TX power</text><text x="132" y="136" text-anchor="middle" font-size="11.5" fill="#a9a69e">proves it transmitted,</text><text x="132" y="152" text-anchor="middle" font-size="11.5" fill="#a9a69e">not that it was heard</text></g><g><rect x="272" y="52" width="216" height="112" rx="8" fill="#5c9df2" fill-opacity="0.12" stroke="#5c9df2" stroke-width="2"></rect><text x="380" y="76" text-anchor="middle" font-weight="600" fill="#ecebe7">Gateway</text><text x="380" y="94" text-anchor="middle" font-size="11.5" fill="#ecebe7">watch-board.py or syslog</text><text x="380" y="118" text-anchor="middle" font-size="11.5" fill="#ecebe7">same FCnt, RSSI, SNR</text><text x="380" y="136" text-anchor="middle" font-size="11.5" fill="#ecebe7">proves the gateway heard it;</text><text x="380" y="152" text-anchor="middle" font-size="11.5" fill="#ecebe7">built-in server mode only</text></g><g><rect x="520" y="52" width="216" height="112" rx="8" fill="none" stroke="#7c7970" stroke-width="1.25"></rect><text x="628" y="76" text-anchor="middle" font-weight="600" fill="#ecebe7">ChirpStack</text><text x="628" y="94" text-anchor="middle" font-size="11.5" fill="#a9a69e">UI: LoRaWAN frames tab</text><text x="628" y="118" text-anchor="middle" font-size="11.5" fill="#ecebe7">same FCnt, ADR decisions</text><text x="628" y="136" text-anchor="middle" font-size="11.5" fill="#a9a69e">proves the server got it;</text><text x="628" y="152" text-anchor="middle" font-size="11.5" fill="#a9a69e">packet forwarder mode</text></g><g fill="none" stroke="#7c7970" stroke-width="1.25"><path d="M240 108H270" marker-end="url(#obs-arrow)"></path><path d="M488 108H518" marker-end="url(#obs-arrow)"></path></g><text x="24" y="196" font-size="11.5" fill="#a9a69e">Match the frame counter (FCnt) across the three. A counter on the board but not at the gateway is a lost uplink.</text><text x="24" y="214" font-size="11.5" fill="#a9a69e">The board itself only learns it was heard when a downlink comes back ([DL] lines in its trace).</text></svg>
+<figcaption>Observation points along the uplink path</figcaption></figure>
+
+<h3>Example: a live gateway capture</h3>
+<p>Two minutes of <code>watch-board.py</code>, run in an SSH session on the gateway, while the built-in server was in charge:</p>
+<pre><code>admin@localhost:/tmp# python /tmp/watch-board.py
+Watching 00-80-e1-15-05-30-f7-17 on this gateway (Ctrl-C to stop)
+UTC time   FCnt  MHz      ch   DR            RSSI  SNR   ADR  ADRACKReq
+23:23:08    758    918.0   14  DR3 SF9BW125    -72    9.2   1    0
+   ADR from network server: LinkADRReq DR3, TXPower idx 10 (EIRP 10 dBm), ChMask 0xFF00 cntl 0, NbTrans 1
+23:23:23    759    918.2   15  DR3 SF9BW125    -72   11.0   1    0
+23:23:38    760    917.0    9  DR3 SF9BW125    -72   12.2   1    0
+23:23:53    761    917.6   12  DR3 SF9BW125    -72   11.5   1    0
+23:24:08    762    917.4   11  DR3 SF9BW125    -71   11.8   1    0
+23:24:23    763    917.2   10  DR3 SF9BW125    -73    8.5   1    0
+23:24:38    764    917.8   13  DR3 SF9BW125    -75   13.0   1    0
+23:24:53    765    916.8    8  DR3 SF9BW125    -75   13.8   1    0</code></pre>
+<table>
+<thead><tr><th>Column</th><th>What it shows</th><th>What this capture tells us</th></tr></thead>
+<tbody>
+<tr><td>UTC time</td><td>When the gateway received the uplink</td><td>One every 15 s, the board's send period</td></tr>
+<tr><td>FCnt</td><td>The board's uplink frame counter</td><td>758 to 765 with no gaps: no uplink lost in these two minutes</td></tr>
+<tr><td>MHz, ch</td><td>Frequency, and the LoRaWAN channel it maps to</td><td>All eight channels 8-15 used, in pseudo-random order: the board and the gateway agree on sub-band 2</td></tr>
+<tr><td>DR</td><td>Data rate (spreading factor and bandwidth)</td><td>DR3 = SF9, 125 kHz, the rate the built-in server set. Channel 65 (500 kHz) stays unused because only DR6 runs on it</td></tr>
+<tr><td>RSSI</td><td>Received power at the gateway, dBm</td><td>-71 to -75 dBm: very strong, as expected at bench distance</td></tr>
+<tr><td>SNR</td><td>Signal-to-noise ratio, dB: the main ADR input</td><td>8.5 to 13.8 dB, while SF9 needs only -12.5 dB: about 21 dB of spare margin. A more aggressive server would use it</td></tr>
+<tr><td>ADR</td><td>Bit set by the board: "the network may adjust me"</td><td>1: ADR is on</td></tr>
+<tr><td>ADRACKReq</td><td>Bit set by the board when it has not heard the network for a while</td><td>0: the board hears downlinks often enough, so no back-off</td></tr>
+<tr><td>ADR from network server</td><td>The last LinkADRReq the server sent, decoded. Printed at start and whenever it changes</td><td>DR3, TX index 10, channels 8-15, one transmission per uplink: matches the board's trace</td></tr>
+</tbody></table>
+<p>To check the board side, compare the FCnt with the <code>[UL]</code> lines on the board's serial trace: the same counter should appear on both.</p>
+<table>
+<thead><tr><th>To see</th><th>Command</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td>Board trace</td><td><code>picocom -b 115200 /dev/ttyACM2</code></td><td>workstation</td></tr>
+<tr><td>Live gateway view</td><td><code>python /tmp/watch-board.py</code> (copy it first: <code>scp watch-board.py admin@192.168.28.28:/tmp/</code>)</td><td>gateway, SSH terminal</td></tr>
+<tr><td>Gateway log</td><td><code>grep lora-network-server /var/log/messages | tail</code></td><td>gateway, SSH terminal</td></tr>
+<tr><td>Gateway LoRa mode</td><td><code>ssh admin@192.168.28.28 'sh -s status' &lt; conduit-lora-mode.sh</code></td><td>workstation, in <code>gateway/</code></td></tr>
+<tr><td>ChirpStack</td><td><code>http://localhost:8080</code>, gateway or device page, LoRaWAN frames</td><td>workstation browser</td></tr>
+</tbody></table>
+
+<h2>Our control scripts</h2>
+<table>
+<thead><tr><th>Script</th><th>Runs on</th><th>What it does</th><th>Undo</th></tr></thead>
+<tbody>
+<tr><td>gateway/conduit-dhcp-client.sh</td><td>gateway serial console</td><td>eth0 to DHCP client, every DHCP server entry off, then save and reboot</td><td>restore the db.json backup, reboot</td></tr>
+<tr><td>gateway/conduit-lora-mode.sh</td><td>workstation, piped over SSH</td><td><code>status</code>, or switch to <code>forwarder</code> (address, ports, sub-band) or <code>server</code>; saves and reboots</td><td>run it with <code>server</code></td></tr>
+<tr><td>gateway/watch-board.py</td><td>gateway, SSH terminal</td><td>live uplinks from our board plus the last ADR command; read-only</td><td>nothing to undo</td></tr>
+<tr><td>chirpstack/register-gateway.sh</td><td>workstation</td><td>add or remove our gateway in ChirpStack</td><td><code>remove</code></td></tr>
+<tr><td>chirpstack/register-device.sh</td><td>workstation</td><td>add or remove our board; <code>reset</code> clears ChirpStack's DevNonce history before a board reset</td><td><code>remove</code></td></tr>
+</tbody></table>
+
+<h2>Next: hand ADR to ChirpStack</h2>
+<ol>
+<li><code>register-gateway.sh add</code> and <code>register-device.sh add</code> (local ChirpStack only).</li>
+<li><code>conduit-lora-mode.sh forwarder</code>: the gateway reboots, 2-3 min.</li>
+<li><code>conduit-lora-mode.sh status</code>, then <code>register-gateway.sh status</code>: the gateway should show as seen. That also proves UDP 1700 gets through the workstation firewall.</li>
+<li>Reset the board and watch its trace for a Join-Accept from ChirpStack.</li>
+</ol>
+<p>From then on it is the same board, gateway and radio with ChirpStack's ADR in charge: the comparison the stakeholder is asking about.</p>
+
+<h2>Gateway terms</h2>
+<table>
+<thead><tr><th>Term</th><th>What it means</th></tr></thead>
+<tbody>
+<tr><td>AEP</td><td>Application Enablement Platform: MultiTech's Conduit firmware with web UI and API. Ours runs AEP 1.7.4 on mLinux 4.1.9.</td></tr>
+<tr><td>Conduit MTCDT-210A</td><td>Our MultiTech gateway model.</td></tr>
+<tr><td>MTAC-LORA-915</td><td>The gateway's LoRa card: 8 channels, SX1301 concentrator. Holds the gateway EUI.</td></tr>
+<tr><td>Concentrator</td><td>Multi-channel gateway radio chip (SX1301) that receives eight 125 kHz channels plus one 500 kHz channel at the same time.</td></tr>
+<tr><td>radio_0 / radio_1</td><td>The concentrator's two RF front ends. Each is tuned to a centre frequency and covers four channels around it.</td></tr>
+<tr><td>db.json</td><td><code>/var/config/db.json</code>: AEP's saved configuration, read at every boot.</td></tr>
+<tr><td>save_restart</td><td>API command that writes the staged configuration to db.json and reboots.</td></tr>
+<tr><td>DHCP client / server</td><td>Client: asks the router for an address, which is what the gateway does. Server: hands addresses out, which the gateway must never do.</td></tr>
+<tr><td>Serial console</td><td>USB link to the gateway's shell (<code>/dev/ttyACM1</code>, 115200 baud). Works even with no network.</td></tr>
+<tr><td>Gateway bridge</td><td>ChirpStack component that receives Semtech UDP from gateways and passes it to ChirpStack over MQTT.</td></tr>
+<tr><td>RSSI / SNR</td><td>Signal strength (dBm) and signal-to-noise ratio (dB) the gateway measures for each uplink. SNR drives ADR. <strong>(ADR)</strong></td></tr>
+</tbody></table>
+
+<h2>Sources</h2>
+<p>Everything above was read or measured on the bench on Oct 27, 2026:</p>
+<ul>
+<li>Gateway: <code>/var/config/db.json</code>, <code>/etc/init.d/lora-network-server</code>, <code>/sbin/loraconfig.py</code>, the web UI code in <code>/var/www/js</code>, the local API (<code>/api/loraNetwork</code>, <code>/api/lora/packets/up</code>) and <code>/var/log/messages</code>.</li>
+<li>Board: serial trace on <code>/dev/ttyACM2</code> and <code>firmware/logs/</code>.</li>
+<li>This repository: the <code>gateway/</code> and <code>chirpstack/</code> scripts and READMEs, and ChirpStack's region files in <code>chirpstack/configuration/chirpstack/</code>.</li>
+</ul>
+<p>See also <a href="lorawan-glossary.html">the LoRaWAN glossary</a> for terms and <a href="lorawan-adr-lab-primer.md">the ADR lab primer</a> for ADR in depth.</p>
+</main></body></html>
