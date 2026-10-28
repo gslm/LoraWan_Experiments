@@ -10,6 +10,9 @@ Last updated: 2026-10-27
 - Primer lives as knowledge-base/lorawan-adr-lab-primer.html only (operator deleted the .md on 2026-10-28).
 - 2026-10-28: knowledge-base/lsm110a-module.html (module primer, versioned, no names) and perguntas-stakeholder.html
   (pt-BR, names allowed, git-ignored) written for the 14:00 meeting.
+- palpites-stakeholder.html/.pdf (pt-BR hunches, git-ignored): bet 1 wrong PA ~50%, bet 2 ChirpStack config ~30%, other ~20%.
+- Key fork for the meeting (questions P3): SJIT AT firmware (board file already HP-only, bet 1 unlikely) vs own firmware.
+- PDFs of all knowledge-base pages exist next to the HTML (git-ignored); regenerate with scratchpad to_pdf.sh if a page changes.
 - LSM110A facts (vendor GitHub Support-SJI/LSM110A): board file HP only for __DEV_LSM110A__; block diagram has one TX path;
   SDK MW 2.4.0 (readme says 2.3.0); default region US915, hybrid off; never full-erase (Sigfox ID/PAC at 0x0803E000).
 - .gitignore at repo root. SESSION-STATE.md and DIRECTIVES.md are versioned (gateway creds are factory defaults, IP is local only). firmware/backup/ stays on disk, not versioned.
