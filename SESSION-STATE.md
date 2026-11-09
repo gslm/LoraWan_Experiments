@@ -1,6 +1,6 @@
 # Session state
 
-Last updated: 2026-10-27
+Last updated: 2026-10-28
 
 ## Decisions
 - Gateway (MultiTech Conduit, AEP 1.7.4) must only be a DHCP client on the office LAN (192.168.28.0/24), never a DHCP server.
@@ -13,6 +13,11 @@ Last updated: 2026-10-27
 - palpites-stakeholder.html/.pdf (pt-BR hunches, git-ignored): bet 1 wrong PA ~50%, bet 2 ChirpStack config ~30%, other ~20%.
 - Key fork for the meeting (questions P3): SJIT AT firmware (board file already HP-only, bet 1 unlikely) vs own firmware.
 - PDFs of all knowledge-base pages exist next to the HTML (git-ignored); regenerate with scratchpad to_pdf.sh if a page changes.
+- STM32CubeWL stack split (checked on all GitHub tags): v1.0.0-v1.4.0 = LoRaMac-node (LoRaWAN_End_Node, HYBRID_ENABLED in
+  lorawan_conf.h); v1.5.0/v1.6.0 = Semtech LoRa Basics Modem only (LoRaWAN_End_Node_LBM, no HYBRID_ENABLED, no compile-time
+  sub-band). LBM AU915 joins cycle banks 0-7 then one 500 kHz channel, keeps the join bank, then needs the NS ChMask
+  (MultiTech NS sends ChMaskCntl 7 + ChMaskCntl 0 / 0xFF00). LBM stores DevNonce in flash (0x0803F000) on every join TX.
+  Teammate's CubeMX project has no HYBRID_ENABLED, so it is very likely LBM; corrected Teams message sent 2026-10-28.
 - LSM110A facts (vendor GitHub Support-SJI/LSM110A): board file HP only for __DEV_LSM110A__; block diagram has one TX path;
   SDK MW 2.4.0 (readme says 2.3.0); default region US915, hybrid off; never full-erase (Sigfox ID/PAC at 0x0803E000).
 - .gitignore at repo root. SESSION-STATE.md and DIRECTIVES.md are versioned (gateway creds are factory defaults, IP is local only). firmware/backup/ stays on disk, not versioned.
@@ -21,6 +26,10 @@ Last updated: 2026-10-27
 - Stakeholder images stay unversioned in ai-content/.
 
 ## Gateway
+- 2026-11-06: gateway is now with a remote teammate and reported misconfigured (exact state unknown), so the values below may be stale.
+  Recovery in progress over their USB console with gateway/conduit-dhcp-client.sh; this is the script's first run on real hardware.
+- 2026-11-09: gateway back on the bench at 192.168.28.115 (DHCP client, no UDP 67 listener), built-in NS mode, receives both boards.
+  Clock wrong (said 2026-11-01 09:21 UTC at real 11-09 18:32 UTC): sntp.enabled=false in db.json. Web UI "8 days ago" comes from this. Not fixed.
 - eth0 = LAN + DHCP client, saved and working. IP 192.168.28.28 (DHCP lease, may change), default route 192.168.28.1.
 - Verified after reboot (Claude, via SSH): no DHCP server listening on UDP 67.
 - SSH from workstation works: `sshpass -p admin ssh admin@192.168.28.28` (operator: `sshp admin@192.168.28.28 admin`).
@@ -36,6 +45,10 @@ Last updated: 2026-10-27
 ## Board (NUCLEO-WL55JC)
 - Flashed with firmware/LoRaWAN_End_Node_ADR (ADR trace), joined the gateway's built-in network server, uplink every 15 s.
 - Teammate demo backup: firmware/backup/teammate_demo_backup.bin.
+- 2026-11-09: second NUCLEO-WL55JC (ST-LINK SN 0034004C3431510837393937, /dev/ttyACM2) flashed with the same build
+  (-e all, verified). DevEUI 0080E1150530FA5B. Its previous firmware (a teammate's LBM End_Node app) is backed up in
+  firmware/backup/nucleo_0034004C_backup_2026-11-09.bin (+ .sha256, option bytes). On first boot it joined some nearby
+  network (Join-Accept RX1, RSSI -39 dBm, DevAddr 0104A063); which gateway/NS answered is not known.
 
 ## ChirpStack
 - Running in Docker (chirpstack/), UI http://localhost:8080, no gateway connected yet.
