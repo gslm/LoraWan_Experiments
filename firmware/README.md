@@ -41,16 +41,33 @@ If the customer is on an older CubeWL (1.2.x or 1.3.x), compare their `MW_LORAWA
 
 ## 2. Build
 
+The repository is self-contained: everything the build needs is in `firmware/LoRaWAN_End_Node_ADR`. `third_party/` is only a local reference copy and is not needed. The commands below assume the repo is cloned to `~/LoraWan_Experiments`.
+
+### On a new workstation (Linux)
+
+Install the tools from the distribution, or use the STM32 VS Code extension, which brings its own (see below).
+
+```bash
+# workstation
+cd ~
+git clone https://github.com/gslm/LoraWan_Experiments.git
+sudo apt install cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi
+```
+
+CMake 3.22 or newer is required. Checked on 2026-11-09 with a fresh clone and Ubuntu 22.04's packages (CMake 3.22.1, Ninja 1.10.1, arm-none-eabi-gcc 10.3.1): no warnings, same code size as the bench build.
+
 ### CLI
 
 ```bash
-cd firmware/LoRaWAN_End_Node_ADR
-# Use ST's GCC 14.3 bundle (same compiler as VS Code). The system arm-none-eabi-gcc 10.3 also builds warning-free.
-export PATH=$HOME/.local/share/stm32cube/bundles/gnu-tools-for-stm32/14.3.1+st.2/bin:$PATH
+# workstation
+cd ~/LoraWan_Experiments/firmware/LoRaWAN_End_Node_ADR
 cmake --preset Debug          # or Release
 cmake --build --preset Debug
 # -> build/Debug/LoRaWAN_End_Node_ADR.elf (+ .hex, .bin, .map)
 ```
+
+To build with ST's GCC 14.3 bundle instead (the compiler VS Code uses), put it first on `PATH` before `cmake --preset`, and delete `build/` when you switch compilers:
+`export PATH=$HOME/.local/share/stm32cube/bundles/gnu-tools-for-stm32/14.3.1+st.2/bin:$PATH`
 
 The toolchain file looks for `arm-none-eabi-gcc` in this order: `-DARM_TOOLCHAIN_DIR=<dir>` (or the env var of the same name), then `PATH`, then the newest `~/.local/share/stm32cube/bundles/gnu-tools-for-stm32/*`.
 
@@ -68,26 +85,60 @@ I checked that the bundled CMake 4.3.1 + Ninja build produces a binary identical
 
 ## 3. Flash
 
+You need `STM32_Programmer_CLI`. It comes with STM32CubeProgrammer, with STM32CubeIDE (under `/opt/st/stm32cubeide_<version>/plugins/*cubeprogrammer*/tools/bin/`) and with the STM32 VS Code extension (under `~/.local/share/stm32cube/bundles/programmer/<version>/bin/`). On Linux the ST-LINK also needs ST's udev rules (package `st-stlink-udev-rules`, installed with STM32CubeIDE); without them the probe is not listed.
+
+Find the programmer and your board's ST-LINK serial number:
+
 ```bash
-PROG=~/.local/share/stm32cube/bundles/programmer/2.23.0/bin/STM32_Programmer_CLI
-SN=003F00223431511931343632    # NUCLEO ST-LINK-V3E on this bench
-cd firmware/LoRaWAN_End_Node_ADR
+# workstation
+cd ~/LoraWan_Experiments/firmware/LoRaWAN_End_Node_ADR
+PROG=$(find ~/.local/share/stm32cube /opt/st -name STM32_Programmer_CLI -type f 2>/dev/null | head -1)
+$PROG -l st      # note "ST-LINK SN"; a J-Link "Library not found" error here is harmless
+```
+
+Flash (same shell, so `PROG` is still set):
+
+```bash
+# workstation
+cd ~/LoraWan_Experiments/firmware/LoRaWAN_End_Node_ADR
+SN=<ST-LINK SN from the list>
 $PROG -c port=SWD sn=$SN mode=UR -e all -d build/Debug/LoRaWAN_End_Node_ADR.elf -v -rst
 ```
 
+Expected: `Mass erase successfully achieved`, then `Download verified successfully`.
+
 Use `-e all` when you switch from another firmware. Otherwise an old LoRaWAN NVM context at 0x0803F000 may be restored. That page is only written when you press B3 (see §6). For a quick reflash of this same project, `-d ... -v -rst` without `-e all` is enough.
 
-Option bytes on this board: RDP Level 0, ESE=0 (no secure CPU2 area), FSD=1, no PCROP, no WRP, no boot locks. Never change them.
+If the board holds someone else's firmware, back it up first (read only, no reset). Restore it as in §9.
+
+```bash
+# workstation
+cd ~/LoraWan_Experiments/firmware/backup
+$PROG -c port=SWD sn=$SN mode=HOTPLUG -u 0x08000000 0x40000 board_backup.bin
+```
+
+Bench boards (ST-LINK SN, DevEUI): `003F00223431511931343632` / `0080E1150530F717`, and `0034004C3431510837393937` / `0080E1150530FA5B`.
+Option bytes on both: RDP Level 0, ESE=0 (no secure CPU2 area), no PCROP, no WRP, no boot locks. Never change them.
 
 ## 4. Monitor
 
+The ST-LINK virtual COM port is the board's log (115200 8N1). Open it by its `by-id` name: the `/dev/ttyACM*` numbers change between machines and reboots, and the gateway's USB console is also a `ttyACM` device.
+
 ```bash
-picocom -b 115200 /dev/ttyACM2        # exit: Ctrl-A Ctrl-X
-# or a timed capture with host timestamps:
-python3 tools/capture_vcp.py /dev/ttyACM2 60 /tmp/run.log
+# workstation
+cd ~/LoraWan_Experiments/firmware
+ls /dev/serial/by-id/ | grep STLINK
+picocom -b 115200 /dev/serial/by-id/usb-STMicroelectronics_STLINK-V3_<SN>-if02      # exit: Ctrl-A Ctrl-X
 ```
 
-`/dev/ttyACM2` is the ST-LINK VCP (`/dev/serial/by-id/usb-STMicroelectronics_STLINK-V3_003F00223431511931343632-if02`). **Never open `/dev/ttyACM1`**: it is the gateway console.
+Or a timed capture with host timestamps:
+
+```bash
+# workstation
+cd ~/LoraWan_Experiments/firmware
+python3 tools/capture_vcp.py /dev/serial/by-id/usb-STMicroelectronics_STLINK-V3_<SN>-if02 60 /tmp/run.log
+```
+
 Right after you open the port, the first bytes can be stale data buffered by the ST-LINK.
 
 ## 5. Network-server provisioning (MSB first, as typed in ChirpStack/TTS)
@@ -97,12 +148,14 @@ Right after you open the port, the first bytes can be stale data buffered by the
 | DevEUI | **`0080E1150530F717`** (derived from the chip UID64 as upstream does: `0080E1` = ST OUI. Another chip gives a different value, so read it from the `[JOIN] cfg DevEUI=` line.) |
 | JoinEUI / AppEUI | **`0101010101010101`** (ST default) |
 | AppKey | **`2B7E151628AED2A6ABF7158809CF4F3C`** (ST default = the FIPS-197 AES test key; public, lab only) |
-| NwkKey | same as AppKey. For 1.0.x only the AppKey is used. |
+| NwkKey | same as AppKey. Keep both defines in `se-identity.h` equal: for LoRaWAN 1.0.x this stack signs the join and derives the session keys with `LORAWAN_NWK_KEY` (`LoRaMacCrypto.c`); `LORAWAN_APP_KEY` only matters for 1.1. |
 | Activation / class | OTAA, Class A |
 | MAC version | **LoRaWAN 1.0.4** |
 | Regional parameters | **RP002-1.0.3**, AU915, **sub-band 2** (channels 8-15 + 65) = ChirpStack region `au915_1` / TTS `AU_915_928_FSB_2` |
 | ADR | on (device sets FCtrl.ADR=1) |
 | Uplinks | unconfirmed, FPort 2, 5 bytes: `[LED][seq MSB][seq LSB][temp °C int8][battery]` |
+
+**Lab gateway (MultiTech Conduit, built-in network server).** It accepts any device whose JoinEUI and AppKey match its *Network ID (EUI)* and *Network Key*, set in the gateway web UI under *LoRaWAN > Key Management > Local Network Settings*. The lab values are the ST defaults above (`0101010101010101` / `2B7E151628AED2A6ABF7158809CF4F3C`), so a stock board joins without being registered and then shows up under *LoRaWAN > Devices*. In the firmware these are `LORAWAN_JOIN_EUI` and `LORAWAN_NWK_KEY` (plus `LORAWAN_APP_KEY`, kept equal) in `LoRaWAN/App/se-identity.h`.
 
 **DevNonce caveat (1.0.4).** The DevNonce is a counter in the NVM context, and the context is written to flash only when you press **B3**. After every reset or power cycle the device starts again at DevNonce=1. ChirpStack and TTS silently drop join requests with an already-used DevNonce. The first boot capture shows this: after the reset, DevNonce=1 got no Join-Accept and DevNonce=2 joined. So after a reset, expect a few failed joins, or flush the nonces on the server (ChirpStack: device > *Flush OTAA device nonces*; TTS: enable *Resets join nonces* or reset the session).
 This is also a **certification item for the customer**. L2 1.0.4 requires that a DevNonce is never reused, so the product must persist it (for example, store the context after each join request or accept).
@@ -188,7 +241,7 @@ Option bytes were not changed, so they don't need restoring.
 ## 10. ADR-relevant behaviour of this stack (AU915)
 
 * **Uplink dwell time.** `AU915_DEFAULT_UPLINK_DWELL_TIME = 1`, so the minimum uplink DR is DR2 (SF10) and DR2 carries at most 11 bytes. A LinkADRReq asking for DR0/DR1 is NACKed (DataRateACK=0), and per 1.0.4 the whole block is then discarded. Any AU915 TxParamSetupReq is accepted and can switch dwell time off.
-* **TX power.** Index 0..14 maps to EIRP 30..2 dBm (MaxEIRP 30, 2 dB steps). The conducted request is EIRP - 2.15 dBi. On the NUCLEO, PA config is LP+HP (HP ≤ 22 dBm, LP ≤ 15 dBm), so idx0/1/2 all transmit **22 dBm** (clamped) and the PA switches HP→LP at idx6 (15 dBm).
+* **TX power.** Index 0..14 maps to EIRP 30..2 dBm (MaxEIRP 30, 2 dB steps). The conducted request is EIRP - 2.15 dBi. On the NUCLEO, PA config is LP+HP (HP ≤ 22 dBm, LP ≤ 15 dBm), so idx0/1/2 all transmit **22 dBm** (clamped) and the PA switches from HP to LP at idx6 (15 dBm).
 * **Join.** Join requests alternate 8x DR2 (125 kHz) and 1x DR6 (500 kHz, ch65). Data uplinks start at the DR of the successful join.
 * **Device ADR back-off.** ADRACKReq is set after 64 uplinks without a downlink (about 16 min at 15 s). TX power goes back to max after 96. DR steps down at 128 and then every 32 uplinks. At the minimum DR, the default (sub-band 2) channel mask and NbTrans=1 are restored.
 * **LinkADRReq (1.0.4 code path).**
@@ -202,4 +255,4 @@ Option bytes were not changed, so they don't need restoring.
   * The downlink FCtrl.ADR bit is not used by the stack.
 * **What the first live run showed.** A network server answered the join: NetID 000000, DevAddr 0146BD4D, RX2 = DR12 (SF8/500), RX1 delay 1 s, no CFList. It then sent a *confirmed* FPort-0 downlink carrying a 2-command LinkADRReq block: ChMaskCntl=7 enabling ch65, then ChMaskCntl=0 with 0xFF00, DR2, TXPower 0, NbTrans 1. The device accepted it (0x07). Because the downlink was confirmed, the device answered at once with an extra FPort-0 uplink with ACK=1.
   During that run the local ChirpStack MQTT bus showed **no** gateway uplink events, and its `au915_1` config says `rx2_dr=8`. So the server that answered is most likely the Conduit's own built-in network server, not ChirpStack. Confirm this before attributing behaviour to ChirpStack.
-  Over the next uplinks the same server ran ADR: at FCnt 6 it sent LinkADRReq DR2→DR3 with TXPower 0→1, and at FCnt 10 TXPower 1→2. Both were unconfirmed FPort-0 downlinks, and both were accepted. The `[UL]` lines show the radio output stayed at **22 dBm (HP, clamped)** through all three steps, so the server's link budget is off by 4 dB. See `logs/final_flash_capture_2026-10-27.log`.
+  Over the next uplinks the same server ran ADR: at FCnt 6 it sent LinkADRReq DR2 to DR3 with TXPower 0 to 1, and at FCnt 10 TXPower 1 to 2. Both were unconfirmed FPort-0 downlinks, and both were accepted. The `[UL]` lines show the radio output stayed at **22 dBm (HP, clamped)** through all three steps, so the server's link budget is off by 4 dB. See `logs/final_flash_capture_2026-10-27.log`.
